@@ -1,0 +1,60 @@
+design_top/generated_afid.sh
+design_top/build/checkpoints/
+design_top/build/constraints/generated_cl_clocks_aws.xdc
+design_top/build/reports/
+design_top/build/src_post_encryption/
+design_top/build/scripts/hd_visual/
+design_top/build/scripts/*.jou
+design_top/build/scripts/.Xil/
+design_top/build/scripts/*.vivado.log
+design_top/build/scripts/*.txt
+design_top/verif/sim/
+design_top/software/runtime/design_top
+
+*sim_test
+*build.log
+*Catapult
+*catapult.pinfo
+*Catapult.ccs
+*catapult.log
+*default.fsdb
+*inter.fsdb*
+*novas.conf
+*novas.rc
+*novas_dump.log
+*ucli.key
+*verdiLog
+
+# Log file
+# **/logs/
+
+# Temporary files
+**/DS_Store
+*.nfs*
+_*
+
+# IDE files
+.vscode/
+.idea/
+.clangd
+.clang-format
+compile_flags.txt
+CMakeLists.txt
+
+# symbolic links to include directories
+systemc
+matchlib
+systemc/
+matchlib/
+
+# AWS PEM Files for EC2 Instances
+*.pem
+# AWS IAM Access Keys
+*_accessKeys.csv
+*.bak
+
+*.nfs*
+
+## CLion
+cmake-build-*
+.idea/
