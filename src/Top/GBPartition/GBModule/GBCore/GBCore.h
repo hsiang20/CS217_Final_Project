@@ -61,12 +61,13 @@ class GBCore : public match::Module {
   // Response mode for end-of-cycle output push, indicating which interface to
   // respond to
   enum RspMode {
-    RSP_NONE     = 0,   // No response this cycle
-    RSP_SRAM_CFG = 0x3, // AXI read of SC_SRAM_CONFIG
-    RSP_ADDR_CFG = 0x4, // AXI read of address config registers
-    RSP_AXI_SRAM = 0x5, // AXI direct SRAM read
-    RSP_NMP      = 0x7,  // NMP streaming read response
-    RSP_GBControl = 0x8
+    RSP_NONE      = 0,   // No response this cycle
+    RSP_SRAM_CFG  = 0x3, // AXI read of SC_SRAM_CONFIG
+    RSP_ADDR_CFG  = 0x4, // AXI read of address config registers
+    RSP_AXI_SRAM  = 0x5, // AXI direct SRAM read
+    RSP_NMP       = 0x7, // NMP streaming read response
+    RSP_GBControl = 0x8, // GBControl streaming read response
+    RSP_TRANSPOSE = 0x9  // Transpose read response
   };
 
   // Number of vectors per timestep for each memory region
@@ -137,6 +138,10 @@ public:
   Connections::In<spec::GB::Large::DataReq> gbcontrol_large_req;
   Connections::Out<spec::GB::Large::DataRsp<1>> gbcontrol_large_rsp;
 
+  // Transpose interface
+  Connections::In<spec::GB::Large::DataReq> transpose_large_req;
+  Connections::Out<spec::GB::Large::DataRsp<1>> transpose_large_rsp;
+
   // 32-bit SRAM configuration register
   sc_in<NVUINT32> SC_SRAM_CONFIG;
 
@@ -165,7 +170,8 @@ public:
     nmp_large_rsp.Reset();
     gbcontrol_large_req.Reset();
     gbcontrol_large_rsp.Reset();
-
+    transpose_large_req.Reset();
+    transpose_large_rsp.Reset();
 
     // Reset address mapping registers
 #pragma hls_unroll yes
@@ -333,11 +339,15 @@ public:
       if (!large_req_reg.is_write) {
         rsp_mode = RSP_NMP;
       }
-    }
-    else if (gbcontrol_large_req.PopNB(large_req_reg)){
+    } else if (gbcontrol_large_req.PopNB(large_req_reg)) {
       SetLargeBuffer<1>(large_req_reg);
       if (!large_req_reg.is_write) {
         rsp_mode = RSP_GBControl;
+      }
+    } else if (transpose_large_req.PopNB(large_req_reg)) {
+      SetLargeBuffer<1>(large_req_reg);
+      if (!large_req_reg.is_write) {
+        rsp_mode = RSP_TRANSPOSE;
       }
     }
   }
@@ -371,6 +381,11 @@ public:
       case RSP_GBControl: {
         large_rsp_reg.read_vector[0] = large_port_read_out[0];
         gbcontrol_large_rsp.Push(large_rsp_reg);
+        break;
+      }
+      case RSP_TRANSPOSE: {
+        large_rsp_reg.read_vector[0] = large_port_read_out[0];
+        transpose_large_rsp.Push(large_rsp_reg);
         break;
       }
       // Default: no response this cycle

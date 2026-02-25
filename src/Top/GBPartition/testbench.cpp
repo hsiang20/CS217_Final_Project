@@ -72,11 +72,9 @@ SC_MODULE(Source) {
   void run(){
     data_in.Reset();
     pe_done.Reset();
-
-    wait(1000);
-    std::cout << "@" << sc_time_stamp() <<" TB checkpoint " << std::endl;
-
-  } //run
+    // Just keep the stub alive; the ManagerFromFile drives all AXI commands
+    while (1) wait();
+  }
 };
 
 SC_MODULE(Dest) {
@@ -86,87 +84,55 @@ SC_MODULE(Dest) {
   Connections::In<bool>              done;
   Connections::In<spec::StreamType>  data_out;
 
-  spec::StreamType data_out_dest;
-  bool pe_start_dest;
-  bool done_dest;
-
-  bool done_PopOutport = false;
-  bool done_PopStart = false;
   bool done_PopDone = false;
 
-
-
   SC_CTOR(Dest) {
-    SC_THREAD(PopOutport);
-    sensitive << clk.pos();
-    async_reset_signal_is(rst, false);
-    SC_THREAD(PopStart);
+    SC_THREAD(DrainPorts);
     sensitive << clk.pos();
     async_reset_signal_is(rst, false);
     SC_THREAD(PopDone);
     sensitive << clk.pos();
     async_reset_signal_is(rst, false);
-    SC_THREAD(SimStop); 
+    SC_THREAD(SimStop);
     sensitive << clk.pos();
     async_reset_signal_is(rst, false);
-  }  
+  }
 
-  void PopOutport() {
-   data_out.Reset();
-   wait();
- 
-   while (1) {
-    if (done_PopDone){
-      if (data_out.PopNB(data_out_dest)) {
-          //cout << hex << sc_time_stamp() << " data_out data = " << data_out_dest.data << endl;
-          cout << sc_time_stamp() << " Design data_out result: " << std::hex << " " << data_out_dest.data << endl;
-          done_PopOutport = true;
-      }
-    }
-    wait(); 
-
-   } // while
-   
-  } //PopOutputport
-
-  void PopStart() {
-   pe_start.Reset();
-   wait();
- 
-   while (1) {
-     if (pe_start.PopNB(pe_start_dest)) {
-        cout << sc_time_stamp() << " PE Start signal isssued!!!" << endl;
-        done_PopStart = true;
-     }
-     wait(); 
-   } // while
-   
-  } //PopDone
-
-  void PopDone() {
-   done.Reset();
-   wait();
- 
-   while (1) {
-     if (done.PopNB(done_dest)) {
-        cout << sc_time_stamp() << " Design done issued!!!" << endl;
-        done_PopDone = true;
-     }
-     wait(); 
-   } // while
-   
-  } //PopDone
-
-  void SimStop() {
-    wait ();
-    while(1) {
+  // Drain pe_start and data_out so they never block
+  void DrainPorts() {
+    pe_start.Reset();
+    data_out.Reset();
+    wait();
+    while (1) {
+      bool s; spec::StreamType d;
+      pe_start.PopNB(s);
+      data_out.PopNB(d);
       wait();
-      if (done_PopOutport && done_PopStart && done_PopDone && axiManagerDone) {
-        sc_stop(); 
-      }
     }
   }
 
+  void PopDone() {
+    done.Reset();
+    wait();
+    while (1) {
+      bool d;
+      if (done.PopNB(d)) {
+        cout << sc_time_stamp() << " gb_done received!" << endl;
+        done_PopDone = true;
+      }
+      wait();
+    }
+  }
+
+  void SimStop() {
+    wait();
+    while (1) {
+      wait();
+      if (done_PopDone && axiManagerDone) {
+        sc_stop();
+      }
+    }
+  }
 };
 
 

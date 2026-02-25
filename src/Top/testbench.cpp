@@ -95,7 +95,7 @@ SC_MODULE(Dest) {
         interrupt_count++;
      }
 
-     if (interrupt_count >= 5 && axiManagerDone) {
+     if (interrupt_count >= 1 && axiManagerDone) {
       break;
      }
      wait(); 

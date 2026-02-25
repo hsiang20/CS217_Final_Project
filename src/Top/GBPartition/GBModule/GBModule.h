@@ -30,6 +30,7 @@
 #include "GBCore/GBCore.h"
 #include "GBControl/GBControl.h"
 #include "NMP/NMP.h"
+#include "Transpose/Transpose.h"
 #include "Spec.h"
 
 
@@ -99,9 +100,21 @@ public:
 
   Connections::Combinational<bool> gbcontrol_start;
   Connections::Combinational<bool> nmp_start;
+  Connections::Combinational<bool> transpose_start;
 
   Connections::Combinational<bool> gbcontrol_done;
   Connections::Combinational<bool> nmp_done;
+  Connections::Combinational<bool> transpose_done;
+
+  /** AXI request channel to Transpose */
+  Connections::Combinational<spec::Axi::SubordinateToRVA::Write> transpose_rva_in;
+  /** AXI response channel from Transpose */
+  Connections::Combinational<spec::Axi::SubordinateToRVA::Read>  transpose_rva_out;
+
+  /** Transpose to GBCore large buffer request channel */
+  Connections::Combinational<spec::GB::Large::DataReq>      transpose_large_req;
+  /** GBCore to Transpose large buffer response channel */
+  Connections::Combinational<spec::GB::Large::DataRsp<1>>   transpose_large_rsp;
 
   // ===========================================================================
   // Submodule Instances
@@ -112,6 +125,8 @@ public:
   NMP nmp_inst;
   /** GBControl for data in and out */
   GBControl gbcontrol_inst;
+  /** Transpose engine */
+  Transpose transpose_inst;
 
 
   // ===========================================================================
@@ -136,10 +151,15 @@ public:
       nmp_large_rsp("nmp_large_rsp"),
       gbcontrol_large_req("gbcontrol_large_req"),
       gbcontrol_large_rsp("gbcontrol_large_rsp"),
+      transpose_rva_in("transpose_rva_in"),
+      transpose_rva_out("transpose_rva_out"),
+      transpose_large_req("transpose_large_req"),
+      transpose_large_rsp("transpose_large_rsp"),
       SC_SRAM_CONFIG("SC_SRAM_CONFIG"),
       gbcore_inst("gbcore_inst"),
       nmp_inst("nmp_inst"),
-      gbcontrol_inst("gbcontrol_inst") {
+      gbcontrol_inst("gbcontrol_inst"),
+      transpose_inst("transpose_inst") {
     SC_THREAD(RVAInRun);
     sensitive << clk.pos();
     async_reset_signal_is(rst, false);
@@ -161,6 +181,8 @@ public:
     gbcore_inst.nmp_large_rsp(nmp_large_rsp);
     gbcore_inst.gbcontrol_large_req(gbcontrol_large_req);
     gbcore_inst.gbcontrol_large_rsp(gbcontrol_large_rsp);
+    gbcore_inst.transpose_large_req(transpose_large_req);
+    gbcore_inst.transpose_large_rsp(transpose_large_rsp);
     gbcore_inst.SC_SRAM_CONFIG(SC_SRAM_CONFIG);
 
     // NMP port bindings
@@ -187,6 +209,16 @@ public:
     gbcontrol_inst.pe_start(pe_start);
     gbcontrol_inst.pe_done(pe_done);
 
+    // Transpose port bindings
+    transpose_inst.clk(clk);
+    transpose_inst.rst(rst);
+    transpose_inst.rva_in(transpose_rva_in);
+    transpose_inst.rva_out(transpose_rva_out);
+    transpose_inst.start(transpose_start);
+    transpose_inst.done(transpose_done);
+    transpose_inst.large_req(transpose_large_req);
+    transpose_inst.large_rsp(transpose_large_rsp);
+
   } // GBModule
 
   // ===========================================================================
@@ -201,8 +233,10 @@ public:
     gbcore_rva_in.ResetWrite();
     nmp_rva_in.ResetWrite();
     gbcontrol_rva_in.ResetWrite();
+    transpose_rva_in.ResetWrite();
     gbcontrol_start.ResetWrite();
     nmp_start.ResetWrite();
+    transpose_start.ResetWrite();
     SC_SRAM_CONFIG.write(0);
 
 #pragma hls_pipeline_init_interval 1
@@ -221,20 +255,18 @@ public:
           nmp_rva_in.Push(rva_in_reg);
         } else if (tmp == 0x7) {
           gbcontrol_rva_in.Push(rva_in_reg);
-        } else if (tmp == 0x0){
-            // TODO #1:
-            // 1. Decode the `local_index` from the AXI address to identify the target sub-module.
-            // 2. Send a start signal to the corresponding module's start channel.
-            //    - 0x1: GBControl (PE <-> GB communication)
-            //    - 0x2: NMP
-          /////////////// YOUR CODE STARTS HERE ///////////////
+        } else if (tmp == 0x6) {
+          transpose_rva_in.Push(rva_in_reg);
+        } else if (tmp == 0x0) {
+          // Decode local_index to select start target:
+          //   0x1: GBControl, 0x2: NMP, 0x3: Transpose
           if (local_index == 0x1) {
             gbcontrol_start.Push(1);
           } else if (local_index == 0x2) {
             nmp_start.Push(1);
+          } else if (local_index == 0x3) {
+            transpose_start.Push(1);
           }
-          /////////////// YOUR CODE ENDS HERE ///////////////
-
         }
       }
       wait();
@@ -249,6 +281,7 @@ public:
     gbcore_rva_out.ResetRead();
     nmp_rva_out.ResetRead();
     gbcontrol_rva_out.ResetRead();
+    transpose_rva_out.ResetRead();
 
 #pragma hls_pipeline_init_interval 1
     while (1) {
@@ -259,6 +292,8 @@ public:
       } else if (nmp_rva_out.PopNB(rva_out_reg)) {
         is_valid = 1;
       } else if (gbcontrol_rva_out.PopNB(rva_out_reg)) {
+        is_valid = 1;
+      } else if (transpose_rva_out.PopNB(rva_out_reg)) {
         is_valid = 1;
       }
       if (is_valid) {
@@ -272,22 +307,21 @@ public:
     gb_done.Reset();
     gbcontrol_done.ResetRead();
     nmp_done.ResetRead();
-
+    transpose_done.ResetRead();
 
     #pragma hls_pipeline_init_interval 1
-    while(1) {
-
+    while (1) {
       bool is_done = 0, done_reg = 0;
       if (gbcontrol_done.PopNB(done_reg)) {
         is_done = 1;
-      }
-      else if (nmp_done.PopNB(done_reg)) {
+      } else if (nmp_done.PopNB(done_reg)) {
+        is_done = 1;
+      } else if (transpose_done.PopNB(done_reg)) {
         is_done = 1;
       }
-      if (is_done == 1){
-        gb_done.Push(1);       
+      if (is_done == 1) {
+        gb_done.Push(1);
       }
-
       wait();
     }
   }
