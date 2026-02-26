@@ -36,12 +36,10 @@
 //   Memory 1 (dst): base=64, num_vector=3  → dst SRAM addresses 64,65,66,80,81,82
 //
 // Test steps:
-//   (a) Write GBCore memory config.
-//   (b) Write source matrix elements to SRAM via AXI direct writes.
-//   (c) Write Transpose config.
-//   (d) Start Transpose (region 0x0, local_index 0x3).
-//   (e) Wait for gb_done.
-//   (f) Read back transposed elements and verify.
+//   (a) Write GBCore memory config (3 managers: src=0, dst_naive=1, dst_diag=2).
+//   (b) Write source matrix to SRAM.
+//   (c) Run transpose opcode 0 (naive): config, start, wait gb_done, read back from dst 1, verify.
+//   (d) Run transpose opcode 1 (diagonal): config, start, wait gb_done, read back from dst 2, verify.
 // =============================================================================
 
 #include "GBModule.h"
@@ -139,22 +137,23 @@ SC_MODULE(Source) {
 
     // -----------------------------------------------------------------------
     // (a) GBCore memory config (region 0x4, local_index 0x01)
-    //   Memory 0: num_vector=2, base=0
-    //   Memory 1: num_vector=3, base=64
-    //   128-bit layout: bits[32*i+7:32*i] = num_vector[i]
-    //                   bits[32*i+31:32*i+16] = base[i]
+    //   Memory 0: num_vector=2, base=0   (source)
+    //   Memory 1: num_vector=3, base=64  (naive result)
+    //   Memory 2: num_vector=3, base=128 (diagonal result)
     // -----------------------------------------------------------------------
     NVUINTW(128) gbcore_cfg = 0;
-    gbcore_cfg.set_slc<8>(0,  NVUINT8(2));   // num_vector[0] = 2
-    gbcore_cfg.set_slc<16>(16, NVUINT16(0)); // base[0] = 0
-    gbcore_cfg.set_slc<8>(32, NVUINT8(3));   // num_vector[1] = 3
-    gbcore_cfg.set_slc<16>(48, NVUINT16(64));// base[1] = 64
+    gbcore_cfg.set_slc<8>(0,   NVUINT8(2));    // num_vector[0] = 2
+    gbcore_cfg.set_slc<16>(16, NVUINT16(0));   // base[0] = 0
+    gbcore_cfg.set_slc<8>(32,  NVUINT8(3));    // num_vector[1] = 3
+    gbcore_cfg.set_slc<16>(48, NVUINT16(64));  // base[1] = 64
+    gbcore_cfg.set_slc<8>(64,  NVUINT8(3));    // num_vector[2] = 3
+    gbcore_cfg.set_slc<16>(80, NVUINT16(128)); // base[2] = 128
 
     NVUINTW(24) cfg_addr = 0;
     cfg_addr.set_slc<4>(20, NVUINT4(0x4));
     cfg_addr.set_slc<16>(4, NVUINT16(0x01));
     push_rva_write(cfg_addr, gbcore_cfg);
-    cout << sc_time_stamp() << " [Source] GBCore config written" << endl;
+    cout << sc_time_stamp() << " [Source] GBCore config written (3 managers)" << endl;
 
     // -----------------------------------------------------------------------
     // (b) Write source matrix A[row][col] to SRAM via direct AXI writes.
@@ -174,57 +173,58 @@ SC_MODULE(Source) {
     cout << sc_time_stamp() << " [Source] Source matrix written to SRAM" << endl;
 
     // -----------------------------------------------------------------------
-    // (c) Write Transpose config (region 0x6, local_index 0x01)
-    //   bits[0]     = is_valid = 1
-    //   bits[10:8]  = memory_index_src = 0
-    //   bits[18:16] = memory_index_dst = 1
-    //   bits[39:32] = num_rows = 3
-    //   bits[47:40] = num_cols = 2
+    // (c) Test 1: Naive transpose (opcode 0) -> dst manager 1 (base 64)
+    //   bits[50:48] = opcode = 0
     // -----------------------------------------------------------------------
     NVUINTW(128) xp_cfg = 0;
-    xp_cfg.set_slc<1>(0,  NVUINT1(1));  // is_valid
-    xp_cfg.set_slc<3>(8,  NVUINT3(0));  // memory_index_src
-    xp_cfg.set_slc<3>(16, NVUINT3(1));  // memory_index_dst
-    xp_cfg.set_slc<8>(32, NVUINT8(3));  // num_rows
-    xp_cfg.set_slc<8>(40, NVUINT8(2));  // num_cols
+    xp_cfg.set_slc<1>(0,  NVUINT1(1));   // is_valid
+    xp_cfg.set_slc<3>(8,  NVUINT3(0));   // memory_index_src
+    xp_cfg.set_slc<3>(16, NVUINT3(1));   // memory_index_dst
+    xp_cfg.set_slc<8>(32, NVUINT8(3));   // num_rows
+    xp_cfg.set_slc<8>(40, NVUINT8(2));   // num_cols
+    xp_cfg.set_slc<3>(48, NVUINT3(0));   // opcode = 0 (naive)
 
     NVUINTW(24) xp_cfg_addr = 0;
     xp_cfg_addr.set_slc<4>(20, NVUINT4(0x6));
     xp_cfg_addr.set_slc<16>(4, NVUINT16(0x01));
     push_rva_write(xp_cfg_addr, xp_cfg);
-    cout << sc_time_stamp() << " [Source] Transpose config written" << endl;
+    cout << sc_time_stamp() << " [Source] Transpose config written (opcode=0 naive)" << endl;
 
-    // -----------------------------------------------------------------------
-    // (d) Start Transpose (region 0x0, local_index 0x3)
-    // -----------------------------------------------------------------------
     NVUINTW(24) start_addr = 0;
     start_addr.set_slc<16>(4, NVUINT16(0x3));
     push_rva_write(start_addr, 0);
-    cout << sc_time_stamp() << " [Source] Transpose start issued" << endl;
+    cout << sc_time_stamp() << " [Source] Transpose start (naive)" << endl;
 
-    // -----------------------------------------------------------------------
-    // (e) Wait for gb_done before issuing verification reads
-    // -----------------------------------------------------------------------
     wait_for_gb_done();
-    cout << sc_time_stamp() << " [Source] gb_done received, reading back transposed data" << endl;
+    cout << sc_time_stamp() << " [Source] gb_done (naive), reading back from dst 1" << endl;
 
-    // -----------------------------------------------------------------------
-    // (f) Read back A^T from dst memory (memory 1, base=64, num_vec=3).
-    //
-    // Physical dst SRAM addresses:
-    //   A^T[0][0]=A[0][0] written at (time=0,vec=0): 64+0+(0*3+0)*16 = 64
-    //   A^T[0][1]=A[1][0] written at (time=0,vec=1): 64+0+(0*3+1)*16 = 80
-    //   A^T[0][2]=A[2][0] written at (time=0,vec=2): 64+0+(0*3+2)*16 = 96
-    //   A^T[1][0]=A[0][1] written at (time=1,vec=0): 64+1+(0*3+0)*16 = 65
-    //   A^T[1][1]=A[1][1] written at (time=1,vec=1): 64+1+(0*3+1)*16 = 81
-    //   A^T[1][2]=A[2][1] written at (time=1,vec=2): 64+1+(0*3+2)*16 = 97
-    // -----------------------------------------------------------------------
     push_rva_read(sram_addr(64));
     push_rva_read(sram_addr(80));
     push_rva_read(sram_addr(96));
     push_rva_read(sram_addr(65));
     push_rva_read(sram_addr(81));
     push_rva_read(sram_addr(97));
+
+    // -----------------------------------------------------------------------
+    // (d) Test 2: Diagonal transpose (opcode 1) -> dst manager 2 (base 128)
+    // -----------------------------------------------------------------------
+    g_gb_done = false;  // allow second wait_for_gb_done
+    xp_cfg.set_slc<3>(16, NVUINT3(2));   // memory_index_dst = 2
+    xp_cfg.set_slc<3>(48, NVUINT3(1));   // opcode = 1 (diagonal)
+    push_rva_write(xp_cfg_addr, xp_cfg);
+    cout << sc_time_stamp() << " [Source] Transpose config written (opcode=1 diagonal)" << endl;
+    push_rva_write(start_addr, 0);
+    cout << sc_time_stamp() << " [Source] Transpose start (diagonal)" << endl;
+
+    wait_for_gb_done();
+    cout << sc_time_stamp() << " [Source] gb_done (diagonal), reading back from dst 2" << endl;
+
+    push_rva_read(sram_addr(128));
+    push_rva_read(sram_addr(144));
+    push_rva_read(sram_addr(160));
+    push_rva_read(sram_addr(129));
+    push_rva_read(sram_addr(145));
+    push_rva_read(sram_addr(161));
   }
 };
 
@@ -253,52 +253,47 @@ SC_MODULE(Dest) {
     async_reset_signal_is(rst, false);
   }
 
-  // Expected values for the 6 read-back positions (same order as Source's reads)
-  static const int kNumReads = 6;
-  uint8_t expected_val[kNumReads] = {0x01, 0x03, 0x05, 0x02, 0x04, 0x06};
+  static const int kNumReadsPerTest = 6;
+  static const int kNumTests        = 2;  // naive then diagonal
+  uint8_t expected_val[kNumReadsPerTest] = {0x01, 0x03, 0x05, 0x02, 0x04, 0x06};
 
   void RunReadVerify() {
     rva_out.Reset();
     gb_done.Reset();
     wait();
 
-    // First wait until Transpose signals gb_done
-    while (1) {
-      bool d;
-      if (gb_done.PopNB(d)) {
-        cout << sc_time_stamp() << " [Dest]   gb_done received" << endl;
-        g_gb_done = true;
-        break;
+    for (int test = 0; test < kNumTests; test++) {
+      while (1) {
+        bool d;
+        if (gb_done.PopNB(d)) {
+          cout << sc_time_stamp() << " [Dest]   gb_done received (test " << test << ")" << endl;
+          g_gb_done = true;
+          break;
+        }
+        wait();
       }
-      wait();
-    }
 
-    // Then collect and verify all 6 AXI read responses
-    int read_idx = 0;
-    while (read_idx < kNumReads) {
-      spec::Axi::SubordinateToRVA::Read rsp;
-      if (rva_out.PopNB(rsp)) {
-        spec::VectorType actual;
-        actual = rsp.data;
-        spec::VectorType expected = make_uniform_vector(expected_val[read_idx]);
-
-        bool match = (actual == expected);
-        if (!match) {
-          cout << sc_time_stamp() << " [Dest]   MISMATCH at read " << read_idx
-               << ": expected all 0x" << std::hex << (int)expected_val[read_idx]
+      for (int i = 0; i < kNumReadsPerTest; i++) {
+        spec::Axi::SubordinateToRVA::Read rsp;
+        while (!rva_out.PopNB(rsp)) wait();
+        spec::VectorType actual = rsp.data;
+        spec::VectorType expected = make_uniform_vector(expected_val[i]);
+        int read_idx = test * kNumReadsPerTest + i;
+        if (!(actual == expected)) {
+          cout << sc_time_stamp() << " [Dest]   MISMATCH read " << read_idx
+               << " (test " << test << "): expected 0x" << std::hex << (int)expected_val[i]
                << " got " << actual << endl;
           SC_REPORT_ERROR("Transpose", "read-back mismatch");
           all_reads_ok = false;
         } else {
-          cout << sc_time_stamp() << " [Dest]   Read " << read_idx
-               << " OK: all 0x" << std::hex << (int)expected_val[read_idx] << endl;
+          cout << sc_time_stamp() << " [Dest]   Read " << read_idx << " OK (0x"
+               << std::hex << (int)expected_val[i] << ")" << endl;
         }
-        read_idx++;
       }
-      wait();
+      if (test == 0) g_gb_done = false;  // allow Source to proceed to second transpose
     }
 
-    cout << sc_time_stamp() << " [Dest]   All reads verified." << endl;
+    cout << sc_time_stamp() << " [Dest]   All " << (kNumReadsPerTest * kNumTests) << " reads verified (naive + diagonal)." << endl;
     sc_stop();
   }
 
@@ -390,8 +385,8 @@ SC_MODULE(testbench) {
     rst.write(true);
     cout << "@" << sc_time_stamp() << " De-asserting reset" << endl;
 
-    // Generous timeout: 6 elements × ~5 cycles each + overhead
-    wait(5000, SC_NS);
+    // Timeout: 2 tests × (6 elements × ~5 cycles) + overhead
+    wait(10000, SC_NS);
     cout << sc_time_stamp() << " ERROR: Simulation timed out!" << endl;
     SC_REPORT_ERROR("testbench", "Simulation timeout");
     sc_stop();

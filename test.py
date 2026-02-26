@@ -23,12 +23,10 @@ def systemc_sim():
     log_file = os.path.join(reports_dir, "systemc.log.txt")
 
     # List of directories to run 'make' in.
-    # Only the modules relevant to matrix transpose are tested here.
-    # Removed: PEPartition (PE compute not used), NMP (softmax/rmsnorm not used),
-    #          GBControl (PE<->GB streaming not used for transpose).
+    # Transpose-related tests: GBCore (SRAM), GBModule (opcode 0 + 1), GBPartition, Top.
     make_dirs = [
         "src/Top/GBPartition/GBModule/GBCore",
-        "src/Top/GBPartition/GBModule",
+        "src/Top/GBPartition/GBModule",   # runs both naive and diagonal transpose
         "src/Top/GBPartition",
         "src/Top",
     ]
@@ -92,8 +90,7 @@ def rtl_sim():
     os.makedirs(reports_dir, exist_ok=True)
     log_file = os.path.join(reports_dir, "rtl_sim.log.txt")
 
-    # List of directories to run HLS synthesis in.
-    # Only transpose-relevant modules are synthesised.
+    # List of directories to run HLS synthesis in (transpose-related only).
     make_dirs = [
         "hls/Top/GBPartition/GBModule/GBCore",
         "hls/Top/GBPartition/GBModule",

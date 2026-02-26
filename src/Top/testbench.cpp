@@ -51,6 +51,8 @@
    #pragma CTC SKIP
 #endif
 
+// Top-level integration: AXI from axi_commands_test.csv runs both transpose opcodes
+// (0 = naive, 1 = diagonal), verifies read-back for each; pass when interrupt and manager done.
 bool correct = true;
 bool axiManagerDone = false;
 
@@ -179,8 +181,7 @@ SC_MODULE(testbench) {
       }
     }
 
-    wait(2000, SC_NS );
-    // If timeout happens, test is a fail
+    wait(5000, SC_NS);
     cout << "Error: Simulation timed out! No interrupt from DUT" << endl;
     SC_REPORT_ERROR("testbench", "Simulation timeout");
     sc_stop();

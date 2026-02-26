@@ -33,6 +33,7 @@
 //   bits [18:16]  : memory_index_dst  (destination memory manager)
 //   bits [39:32]  : num_rows   (rows in the source matrix)
 //   bits [47:40]  : num_cols   (VectorType columns per row in source)
+//   bits [50:48]  : opcode     0 = naive (original), 1 = diagonal (efficient)
 // ============================================================
 class TransposeConfig {
   static const int write_width = 128;
@@ -43,6 +44,7 @@ class TransposeConfig {
   NVUINT3 memory_index_dst;
   NVUINT8 num_rows;
   NVUINT8 num_cols;
+  NVUINT3 opcode;  // 0 = naive, 1 = diagonal (BRAM by anti-diagonals)
 
   // Runtime counters – not part of the AXI config register
   NVUINT8 row_counter;
@@ -54,6 +56,7 @@ class TransposeConfig {
     memory_index_dst = 0;
     num_rows         = 1;
     num_cols         = 1;
+    opcode           = 0;
     row_counter      = 0;
     col_counter      = 0;
   }
@@ -65,6 +68,7 @@ class TransposeConfig {
       memory_index_dst = nvhls::get_slc<3>(data, 16);
       num_rows         = nvhls::get_slc<8>(data, 32);
       num_cols         = nvhls::get_slc<8>(data, 40);
+      opcode           = nvhls::get_slc<3>(data, 48);
     }
   }
 
@@ -76,6 +80,7 @@ class TransposeConfig {
       data.set_slc<3>(16, memory_index_dst);
       data.set_slc<8>(32, num_rows);
       data.set_slc<8>(40, num_cols);
+      data.set_slc<3>(48, opcode);
     }
   }
 
@@ -106,22 +111,21 @@ class TransposeConfig {
 // ============================================================
 // Transpose Module
 //
-// Reads A[row][col] from the src memory manager and writes
-// A^T[col][row] to the dst memory manager, iterating over
-// every (row, col) pair for the configured matrix dimensions.
+// Opcode 0 (naive): Read A[row][col], write A^T[col][row] element-by-element.
+//
+// Opcode 1 (diagonal): Address unit processes by anti-diagonals.
+//   For each anti-diagonal d (i+j=d), read all A[i][d-i] into local BRAM,
+//   then read back from BRAM and write A^T[d-i][i]. Better locality.
 //
 // Matrix layout in GBCore SRAM (via DataReq addressing):
 //   Element A[r][c]  →  (memory_index=src, timestep=r, vector=c)
 //   Element A^T[c][r] → (memory_index=dst, timestep=c, vector=r)
 //
-// GBCore must be pre-configured so that:
-//   num_vector_large[src] == num_cols
-//   num_vector_large[dst] == num_rows
-//
-// AXI address region decoded by GBModule:
-//   0x6:  config read/write (local_index 0x01)
-// Start signal: GBModule pushes it when region=0x0, local_index=0x3
+// AXI address region: 0x6, local_index 0x01. Start: region 0x0, local_index 0x3.
 // ============================================================
+
+static const unsigned int kMaxDiagLen = 32;  // max anti-diagonal length (min(R,C))
+
 class Transpose : public match::Module {
   static const int kDebugLevel = 3;
   SC_HAS_PROCESS(Transpose);
@@ -140,9 +144,13 @@ class Transpose : public match::Module {
   Connections::In<spec::GB::Large::DataRsp<1>>  large_rsp;
 
   // --------------------------------------------------------
-  // FSM
+  // FSM: naive path (READ, WAIT_RSP, WRITE, NEXT, FIN) and diagonal path
   // --------------------------------------------------------
-  enum FSM { IDLE, READ, WAIT_RSP, WRITE, NEXT, FIN };
+  enum FSM {
+    IDLE,
+    READ, WAIT_RSP, WRITE, NEXT, FIN,
+    DIAG_START, DIAG_READ, DIAG_READ_WAIT, DIAG_WRITE, DIAG_NEXT
+  };
   FSM state;
 
   bool is_start;
@@ -151,6 +159,14 @@ class Transpose : public match::Module {
   bool w_axi_rsp;
   spec::Axi::SubordinateToRVA::Read rva_out_reg;
   spec::GB::Large::WordType         read_data;
+
+  // Diagonal (efficient) path: local BRAM + address-unit state
+  spec::GB::Large::WordType diag_bram[kMaxDiagLen];
+  NVUINT16 diag_d;       // current anti-diagonal index (i+j = d)
+  NVUINT8  diag_i_lo;    // first row index for this diagonal
+  NVUINT8  diag_len;     // number of elements in this diagonal
+  NVUINT8  diag_in_idx;  // index into diag_bram when storing reads
+  NVUINT8  diag_out_idx; // index when writing from diag_bram to dest
 
   Transpose(sc_module_name nm)
       : match::Module(nm),
@@ -169,12 +185,38 @@ class Transpose : public match::Module {
     state    = IDLE;
     is_start = 0;
     config.Reset();
+    diag_d       = 0;
+    diag_i_lo    = 0;
+    diag_len     = 0;
+    diag_in_idx  = 0;
+    diag_out_idx = 0;
     rva_in.Reset();
     rva_out.Reset();
     start.Reset();
     done.Reset();
     large_req.Reset();
     large_rsp.Reset();
+  }
+
+  // Compute start row and length for anti-diagonal d (indices (i, d-i)).
+  void DiagBounds(NVUINT16 d, NVUINT8& i_lo, NVUINT8& len) const {
+    NVUINT8 R = config.num_rows;
+    NVUINT8 C = config.num_cols;
+    int di = (int)d;
+    int ri = (int)R;
+    int ci = (int)C;
+    int i_lo_int = (di >= ci) ? (di - ci + 1) : 0;
+    if (i_lo_int < 0) i_lo_int = 0;
+    int i_hi_int = (di < ri) ? di : (ri - 1);
+    if (i_hi_int >= ri) i_hi_int = ri - 1;
+    if (i_lo_int > i_hi_int) {
+      i_lo = 0;
+      len  = 0;
+      return;
+    }
+    i_lo = (NVUINT8)i_lo_int;
+    len  = (NVUINT8)(i_hi_int - i_lo_int + 1);
+    if (len > kMaxDiagLen) len = kMaxDiagLen;
   }
 
   void Initialize() { w_axi_rsp = 0; }
@@ -212,7 +254,7 @@ class Transpose : public match::Module {
       case IDLE: break;
 
       case READ: {
-        // Read A[row_counter][col_counter] from src
+        // Naive: read A[row_counter][col_counter] from src
         req.is_write       = 0;
         req.memory_index   = config.memory_index_src;
         req.vector_index   = config.col_counter;
@@ -223,14 +265,13 @@ class Transpose : public match::Module {
       }
 
       case WAIT_RSP: {
-        // Collect the read response from GBCore
         spec::GB::Large::DataRsp<1> rsp = large_rsp.Pop();
         read_data                       = rsp.read_vector[0];
         break;
       }
 
       case WRITE: {
-        // Write A^T[col_counter][row_counter] to dst
+        // Naive: write A^T[col_counter][row_counter] to dst
         req.is_write       = 1;
         req.memory_index   = config.memory_index_dst;
         req.vector_index   = config.row_counter;
@@ -248,6 +289,50 @@ class Transpose : public match::Module {
         break;
       }
 
+      // --- Diagonal (efficient) path: address unit + BRAM ---
+      case DIAG_START: {
+        DiagBounds(diag_d, diag_i_lo, diag_len);
+        diag_in_idx  = 0;
+        diag_out_idx = 0;
+        break;
+      }
+
+      case DIAG_READ: {
+        // Read A[i][d-i] into BRAM: (row,col) = (diag_i_lo + diag_in_idx, d - (diag_i_lo + diag_in_idx))
+        NVUINT8 row = diag_i_lo + diag_in_idx;
+        NVUINT8 col = (NVUINT8)(diag_d - (NVUINT16)row);
+        req.is_write       = 0;
+        req.memory_index   = config.memory_index_src;
+        req.vector_index   = col;
+        req.timestep_index = row;
+        req.write_data     = 0;
+        large_req.Push(req);
+        break;
+      }
+
+      case DIAG_READ_WAIT: {
+        spec::GB::Large::DataRsp<1> rsp = large_rsp.Pop();
+        diag_bram[diag_in_idx] = rsp.read_vector[0];
+        diag_in_idx++;
+        break;
+      }
+
+      case DIAG_WRITE: {
+        // Write from BRAM to A^T[col][row]: (col, row) = (d - (i_lo + out_idx), i_lo + out_idx)
+        NVUINT8 row = diag_i_lo + diag_out_idx;
+        NVUINT8 col = (NVUINT8)(diag_d - (NVUINT16)row);
+        req.is_write       = 1;
+        req.memory_index   = config.memory_index_dst;
+        req.vector_index   = row;   // A^T vector_index = row of original
+        req.timestep_index = col;   // A^T timestep_index = col of original
+        req.write_data     = diag_bram[diag_out_idx];
+        large_req.Push(req);
+        diag_out_idx++;
+        break;
+      }
+
+      case DIAG_NEXT: break;
+
       default: break;
     }
   }
@@ -255,17 +340,43 @@ class Transpose : public match::Module {
   void UpdateFSM() {
     FSM next;
     switch (state) {
-      case IDLE:     next = is_start ? READ : IDLE; break;
-      case READ:     next = WAIT_RSP;                break;
-      case WAIT_RSP: next = WRITE;                   break;
-      case WRITE:    next = NEXT;                    break;
+      case IDLE:
+        next = is_start ? (config.opcode == 0 ? READ : DIAG_START) : IDLE;
+        break;
+      case READ:     next = WAIT_RSP; break;
+      case WAIT_RSP: next = WRITE;   break;
+      case WRITE:    next = NEXT;    break;
       case NEXT: {
         bool all_done = config.Advance();
         next          = all_done ? FIN : READ;
         break;
       }
-      case FIN:    next = IDLE; break;
-      default:     next = IDLE; break;
+      case FIN: next = IDLE; break;
+
+      case DIAG_START:
+        next = (diag_len == 0) ? DIAG_NEXT : DIAG_READ;
+        break;
+      case DIAG_READ:
+        next = DIAG_READ_WAIT;
+        break;
+      case DIAG_READ_WAIT:
+        next = (diag_in_idx >= diag_len) ? DIAG_WRITE : DIAG_READ;
+        break;
+      case DIAG_WRITE:
+        next = (diag_out_idx >= diag_len) ? DIAG_NEXT : DIAG_WRITE;
+        break;
+      case DIAG_NEXT: {
+        NVUINT16 max_d = (NVUINT16)config.num_rows + (NVUINT16)config.num_cols - 1;
+        if (diag_d >= max_d) {
+          next = FIN;
+        } else {
+          diag_d++;
+          next = DIAG_START;
+        }
+        break;
+      }
+
+      default: next = IDLE; break;
     }
     state = next;
   }

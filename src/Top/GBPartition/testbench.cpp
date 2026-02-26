@@ -52,6 +52,8 @@
    #pragma CTC SKIP
 #endif
 
+// Transpose integration test: ManagerFromFile drives AXI from axi_commands_test.csv
+// (transpose config uses opcode 0 = naive). Test passes when gb_done is received.
 bool correct = true;
 bool axiManagerDone = false;
 

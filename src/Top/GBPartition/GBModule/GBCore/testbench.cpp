@@ -213,7 +213,7 @@ SC_MODULE(Dest) {
         cout << hex << sc_time_stamp() << " RVA read data = " << rva_out.data
              << endl;
         if (expected_cfg_valid && !seen_cfg_read) {
-          if (rva_out.data != expected_cfg_data) {
+          if (!(rva_out.data == expected_cfg_data)) {
             SC_REPORT_ERROR("GBCore", "RVA config readback mismatch");
           } else {
             cout << sc_time_stamp() << " RVA config matched" << endl;
