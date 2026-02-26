@@ -91,12 +91,21 @@ SC_MODULE(Source) {
   Connections::Out<spec::Axi::SubordinateToRVA::Write> rva_in_large;
   Connections::Out<spec::GB::Large::DataReq> nmp_large_req;
   Connections::Out<spec::GB::Large::DataReq> gbcontrol_large_req;
-
+  // Transpose stub: never sends requests in this test
+  Connections::Out<spec::GB::Large::DataReq> transpose_large_req;
 
   SC_CTOR(Source) {
     SC_THREAD(run);
     sensitive << clk.pos();
     async_reset_signal_is(rst, false);
+    SC_THREAD(DrainTransposeReq);
+    sensitive << clk.pos();
+    async_reset_signal_is(rst, false);
+  }
+
+  void DrainTransposeReq() {
+    transpose_large_req.Reset();
+    while (1) wait(); // never sends; satisfies port binding
   }
 
   void run() {
@@ -170,12 +179,26 @@ SC_MODULE(Dest) {
   // NMP read response interface - receives SRAM read data
   Connections::In<spec::GB::Large::DataRsp<1>> nmp_large_rsp;
   Connections::In<spec::GB::Large::DataRsp<1>> gbcontrol_large_rsp;
-
+  // Transpose stub: drain so the channel never stalls
+  Connections::In<spec::GB::Large::DataRsp<1>> transpose_large_rsp;
 
   SC_CTOR(Dest) {
     SC_THREAD(run);
     sensitive << clk.pos();
     async_reset_signal_is(rst, false);
+    SC_THREAD(DrainTransposeRsp);
+    sensitive << clk.pos();
+    async_reset_signal_is(rst, false);
+  }
+
+  void DrainTransposeRsp() {
+    transpose_large_rsp.Reset();
+    wait();
+    while (1) {
+      spec::GB::Large::DataRsp<1> d;
+      transpose_large_rsp.PopNB(d);
+      wait();
+    }
   }
 
   void run() {
@@ -255,7 +278,9 @@ SC_MODULE(testbench) {
   Connections::Combinational<spec::GB::Large::DataReq> gbcontrol_large_req;
   Connections::Combinational<spec::GB::Large::DataRsp<1>> gbcontrol_large_rsp;
 
-
+  // Transpose interface stubs (Transpose module not exercised in this test)
+  Connections::Combinational<spec::GB::Large::DataReq> transpose_large_req;
+  Connections::Combinational<spec::GB::Large::DataRsp<1>> transpose_large_rsp;
 
   // Module instances
   NVHLS_DESIGN(GBCore) dut;
@@ -278,6 +303,8 @@ SC_MODULE(testbench) {
     dut.nmp_large_rsp(nmp_large_rsp);
     dut.gbcontrol_large_req(gbcontrol_large_req);
     dut.gbcontrol_large_rsp(gbcontrol_large_rsp);
+    dut.transpose_large_req(transpose_large_req);
+    dut.transpose_large_rsp(transpose_large_rsp);
     dut.SC_SRAM_CONFIG(sc_sram_config);
 
     source.clk(clk);
@@ -285,13 +312,14 @@ SC_MODULE(testbench) {
     source.rva_in_large(rva_in_large);
     source.nmp_large_req(nmp_large_req);
     source.gbcontrol_large_req(gbcontrol_large_req);
-
+    source.transpose_large_req(transpose_large_req);
 
     dest.clk(clk);
     dest.rst(rst);
     dest.rva_out_large(rva_out_large);
     dest.nmp_large_rsp(nmp_large_rsp);
     dest.gbcontrol_large_rsp(gbcontrol_large_rsp);
+    dest.transpose_large_rsp(transpose_large_rsp);
 
 
     SC_THREAD(run);

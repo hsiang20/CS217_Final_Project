@@ -16,8 +16,9 @@ AWS_PATH = os.getenv("AWS_HOME")
 def systemc_sim():
     test_list = []
     test_status = []
-    # Create the reports directory if it doesn't exist
-    reports_dir = "reports/hls"
+    # Store reports under the project root regardless of where the script is invoked
+    project_root = os.path.dirname(os.path.abspath(__file__))
+    reports_dir = os.path.join(project_root, "reports", "hls")
     os.makedirs(reports_dir, exist_ok=True)
     log_file = os.path.join(reports_dir, "systemc.log.txt")
 
@@ -69,6 +70,11 @@ def systemc_sim():
                 f.write(f"--- Error for {directory} ---\n")
                 f.write(str(e))
                 f.write("\n")
+                # Also log captured output so failures are diagnosable
+                if hasattr(e, "stdout") and e.stdout:
+                    f.write(e.stdout)
+                if hasattr(e, "stderr") and e.stderr:
+                    f.write(e.stderr)
             test_status.append("FAILED")
 
     print("--- SystemC Simulation Results ---")
@@ -81,8 +87,8 @@ def systemc_sim():
 def rtl_sim():
     test_list = []
     test_status = []
-    # Create the reports directory if it doesn't exist
-    reports_dir = "reports/hls"
+    project_root = os.path.dirname(os.path.abspath(__file__))
+    reports_dir = os.path.join(project_root, "reports", "hls")
     os.makedirs(reports_dir, exist_ok=True)
     log_file = os.path.join(reports_dir, "rtl_sim.log.txt")
 
@@ -123,6 +129,10 @@ def rtl_sim():
                 f.write(f"--- Error for {directory} ---\n")
                 f.write(str(e))
                 f.write("\n")
+                if hasattr(e, "stdout") and e.stdout:
+                    f.write(e.stdout)
+                if hasattr(e, "stderr") and e.stderr:
+                    f.write(e.stderr)
 
         testname = directory.split("/")[-1]
         test_list.append(testname)

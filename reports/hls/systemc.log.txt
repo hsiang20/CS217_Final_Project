@@ -1,0 +1,124 @@
+--- Output for src/Top/GBPartition/GBModule/GBCore ---
+rm -rf *.o sim_* dump.vcd
+rm -rf build.log
+g++ -o sim_test -DHLS_ALGORITHMICC -Wall -Wno-unknown-pragmas -Wno-virtual-move-assign -Wno-unused-local-typedefs -std=c++11  -I. -I/cad/mentor/2024.2_1/Mgc_home/shared/include -I/cad/xilinx/vitis/2020.1/Vitis/2020.1/cardano/tps/boost_1_64_0 -I/cad/mentor/2024.2_1/Mgc_home/shared/include -I/home/users/hsiangc/cs217/CS217_Final_Project/src/include -I/home/users/hsiangc/cs217/CS217_Final_Project/src -I/cad/mentor/2024.2_1/Mgc_home/shared/pkgs/matchlib_connections/include -I/cad/mentor/2024.2_1/Mgc_home/shared/include -I/cad/mentor/2024.2_1/Mgc_home/shared/pkgs/matchlib/cmod/include -I/cad/xilinx/vitis/2020.1/Vitis/2020.1/cardano/lib/lnx64.o -I/cad/xilinx/vitis/2020.1/Vitis/2020.1/lib/lnx64.o  -L. -L/cad/mentor/2024.2_1/Mgc_home/shared/lib -L/cad/mentor/2024.2_1/Mgc_home/shared/pkgs/boostpp/pp/lib -DHLS_CATAPULT -DCONNECTIONS_ACCURATE_SIM -DSC_INCLUDE_DYNAMIC_PROCESSES testbench.cpp   -lstdc++ -lsystemc -lm -lpthread > build.log 2>&1
+./sim_test
+================================
+SETTING RANDOM SEED = 19650218
+================================
+Connections Clock: tb.clk Period: 1 ns
+@2 ns Asserting reset
+@4 ns De-Asserting reset
+8 ns RVA read data = 0x1
+8 ns RVA config matched
+44 ns Large buffer bank 0 read matched
+46 ns Large buffer bank 1 read matched
+48 ns Large buffer bank 2 read matched
+50 ns Large buffer bank 3 read matched
+52 ns Large buffer bank 4 read matched
+54 ns Large buffer bank 5 read matched
+56 ns Large buffer bank 6 read matched
+58 ns Large buffer bank 7 read matched
+60 ns Large buffer bank 8 read matched
+62 ns Large buffer bank 9 read matched
+64 ns Large buffer bank a read matched
+66 ns Large buffer bank b read matched
+68 ns Large buffer bank c read matched
+70 ns Large buffer bank d read matched
+72 ns Large buffer bank e read matched
+74 ns Large buffer bank f read matched
+@504 ns All 10 bank reads completed
+@504 ns sc_stop
+
+Info: /OSCI/SystemC: Simulation stopped by user.
+TESTBENCH PASS
+
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+
+--- Output for src/Top/GBPartition/GBModule ---
+rm -rf *.o sim_* dump.vcd
+rm -rf build.log
+g++ -o sim_test -DHLS_ALGORITHMICC -Wall -Wno-unknown-pragmas -Wno-virtual-move-assign -Wno-unused-local-typedefs -std=c++11  -I. -I/cad/mentor/2024.2_1/Mgc_home/shared/include -I/cad/xilinx/vitis/2020.1/Vitis/2020.1/cardano/tps/boost_1_64_0 -I/cad/mentor/2024.2_1/Mgc_home/shared/include -I/home/users/hsiangc/cs217/CS217_Final_Project/src/include -I/home/users/hsiangc/cs217/CS217_Final_Project/src -I/cad/mentor/2024.2_1/Mgc_home/shared/pkgs/matchlib_connections/include -I/cad/mentor/2024.2_1/Mgc_home/shared/include -I/cad/mentor/2024.2_1/Mgc_home/shared/pkgs/matchlib/cmod/include -I/cad/xilinx/vitis/2020.1/Vitis/2020.1/cardano/lib/lnx64.o -I/cad/xilinx/vitis/2020.1/Vitis/2020.1/lib/lnx64.o  -L. -L/cad/mentor/2024.2_1/Mgc_home/shared/lib -L/cad/mentor/2024.2_1/Mgc_home/shared/pkgs/boostpp/pp/lib -DHLS_CATAPULT -DCONNECTIONS_ACCURATE_SIM -DSC_INCLUDE_DYNAMIC_PROCESSES testbench.cpp   -lstdc++ -lsystemc -lm -lpthread > build.log 2>&1
+./sim_test
+================================
+SETTING RANDOM SEED = 19650218
+================================
+Connections Clock: tb.clk Period: 1 ns
+@2 ns Asserting reset
+@4 ns De-asserting reset
+5 ns [Source] GBCore config written
+11 ns [Source] Source matrix written to SRAM
+12 ns [Source] Transpose config written
+13 ns [Source] Transpose start issued
+47 ns [Dest]   gb_done received
+48 ns [Source] gb_done received, reading back transposed data
+52 ns [Dest]   Read 0 OK: all 0x1
+53 ns [Dest]   Read 1 OK: all 0x3
+54 ns [Dest]   Read 2 OK: all 0x5
+55 ns [Dest]   Read 3 OK: all 0x2
+56 ns [Dest]   Read 4 OK: all 0x4
+57 ns [Dest]   Read 5 OK: all 0x6
+58 ns [Dest]   All reads verified.
+
+Info: /OSCI/SystemC: Simulation stopped by user.
+TESTBENCH PASS
+
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+
+--- Output for src/Top/GBPartition ---
+rm -rf *.o sim_* dump.vcd
+rm -rf build.log
+g++ -o sim_test -DHLS_ALGORITHMICC -Wall -Wno-unknown-pragmas -Wno-virtual-move-assign -Wno-unused-local-typedefs -std=c++11  -I. -I/cad/mentor/2024.2_1/Mgc_home/shared/include -I/cad/xilinx/vitis/2020.1/Vitis/2020.1/cardano/tps/boost_1_64_0 -I/cad/mentor/2024.2_1/Mgc_home/shared/include -I/home/users/hsiangc/cs217/CS217_Final_Project/src/include -I/home/users/hsiangc/cs217/CS217_Final_Project/src -I/cad/mentor/2024.2_1/Mgc_home/shared/pkgs/matchlib_connections/include -I/cad/mentor/2024.2_1/Mgc_home/shared/include -I/cad/mentor/2024.2_1/Mgc_home/shared/pkgs/matchlib/cmod/include -I/cad/xilinx/vitis/2020.1/Vitis/2020.1/cardano/lib/lnx64.o -I/cad/xilinx/vitis/2020.1/Vitis/2020.1/lib/lnx64.o  -L. -L/cad/mentor/2024.2_1/Mgc_home/shared/lib -L/cad/mentor/2024.2_1/Mgc_home/shared/pkgs/boostpp/pp/lib -DHLS_CATAPULT -DCONNECTIONS_ACCURATE_SIM -DSC_INCLUDE_DYNAMIC_PROCESSES testbench.cpp   -lstdc++ -lsystemc -lm -lpthread > build.log 2>&1
+./sim_test
+================================
+SETTING RANDOM SEED = 19650218
+================================
+1.75
+Connections Clock: tb.clk Period: 1 ns
+@2 ns Asserting reset
+@4 ns De-Asserting reset
+Manager has finished issuing AXI Writes
+102 ns gb_done received!
+
+Info: /OSCI/SystemC: Simulation stopped by user.
+TESTBENCH PASS
+
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+
+--- Output for src/Top ---
+rm -rf *.o sim_* dump.vcd
+rm -rf build.log
+g++ -o sim_test -DHLS_ALGORITHMICC -Wall -Wno-unknown-pragmas -Wno-virtual-move-assign -Wno-unused-local-typedefs -std=c++11  -I. -I/cad/mentor/2024.2_1/Mgc_home/shared/include -I/cad/xilinx/vitis/2020.1/Vitis/2020.1/cardano/tps/boost_1_64_0 -I/cad/mentor/2024.2_1/Mgc_home/shared/include -I/home/users/hsiangc/cs217/CS217_Final_Project/src/include -I/home/users/hsiangc/cs217/CS217_Final_Project/src -I/cad/mentor/2024.2_1/Mgc_home/shared/pkgs/matchlib_connections/include -I/cad/mentor/2024.2_1/Mgc_home/shared/include -I/cad/mentor/2024.2_1/Mgc_home/shared/pkgs/matchlib/cmod/include -I/cad/xilinx/vitis/2020.1/Vitis/2020.1/cardano/lib/lnx64.o -I/cad/xilinx/vitis/2020.1/Vitis/2020.1/lib/lnx64.o  -L. -L/cad/mentor/2024.2_1/Mgc_home/shared/lib -L/cad/mentor/2024.2_1/Mgc_home/shared/pkgs/boostpp/pp/lib -DHLS_CATAPULT -DCONNECTIONS_ACCURATE_SIM -DSC_INCLUDE_DYNAMIC_PROCESSES testbench.cpp   -lstdc++ -lsystemc -lm -lpthread > build.log 2>&1
+./sim_test
+================================
+SETTING RANDOM SEED = 19650218
+================================
+1.75
+Connections Clock: tb.clk Period: 1 ns
+@2 ns Asserting reset
+@4 ns De-Asserting reset
+123 ns - Interrupt signal issued!
+124 ns - Interrupt signal issued!
+125 ns - Interrupt signal issued!
+126 ns - Interrupt signal issued!
+127 ns - Interrupt signal issued!
+128 ns - Interrupt signal issued!
+129 ns - Interrupt signal issued!
+130 ns - Interrupt signal issued!
+131 ns - Interrupt signal issued!
+132 ns - Interrupt signal issued!
+153 ns Manager has finished issuing AXI Writes
+
+Info: /OSCI/SystemC: Simulation stopped by user.
+TESTBENCH PASS
+
+        SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
+        Copyright (c) 1996-2018 by all Contributors,
+        ALL RIGHTS RESERVED
+
