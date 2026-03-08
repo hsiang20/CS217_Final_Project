@@ -86,10 +86,22 @@ int top_read(int bh, AxiReadCommand* cmd) {
 
     for (int i = 0; i < LOOP_TOP_AXI_AR; i++)
         if (ocl_wr32(bh, ADDR_TOP_AXI_AR_START + i*4, ar[i])) return 1;
-    usleep(10);
 
+    // Poll rd[0] until bridge has captured the AXI read response
+    // (top_r_valid_q=0 returns 0xDEADBEEF)
     uint32_t rd[LOOP_TOP_AXI_R] = {0};
-    for (int i = 0; i < LOOP_TOP_AXI_R; i++)
+    int poll_count = 0;
+    rd[0] = 0xDEADBEEF;
+    while (rd[0] == 0xDEADBEEF && poll_count < 1000) {
+        usleep(1);
+        if (ocl_rd32(bh, ADDR_TOP_AXI_R_START, &rd[0])) return 1;
+        poll_count++;
+    }
+    if (rd[0] == 0xDEADBEEF) {
+        fprintf(stderr, "ERROR: AXI read timeout for addr=0x%X\n", cmd->addr);
+        return 1;
+    }
+    for (int i = 1; i < LOOP_TOP_AXI_R; i++)
         if (ocl_rd32(bh, ADDR_TOP_AXI_R_START + i*4, &rd[i])) return 1;
 
     cmd->data[0] = (rd[0] >> 10) | ((rd[1] & 0x3FF) << 22);

@@ -57,6 +57,8 @@ import tb_type_defines_pkg::*;
   task automatic top_read(input AxiReadCommand read_command);
     logic [49:0] transfer_addr = {8'b0, read_command.addr, 10'b0};
     logic [159:0] transfer_data;
+    logic [31:0] poll_data;
+    int poll_count;
 
     for (int i = 0; i < LOOP_TOP_AXI_AR; i++) begin
         logic [31:0] temp_addr;
@@ -66,8 +68,19 @@ import tb_type_defines_pkg::*;
         ocl_wr32(ADDR_TOP_AXI_AR_START + i*4, temp_addr);
         #10ns;
     end
-    #100ns;
-    for (int i = 0; i < LOOP_TOP_AXI_R; i++) begin
+
+    // Poll rd[0] until bridge has captured the AXI read response
+    // (top_r_valid_q=0 returns 0xDEADBEEF)
+    poll_data = 32'hDEADBEEF;
+    poll_count = 0;
+    while (poll_data == 32'hDEADBEEF && poll_count < 500) begin
+        #20ns;
+        ocl_rd32(ADDR_TOP_AXI_R_START, poll_data);
+        poll_count++;
+    end
+    transfer_data[31:0] = poll_data;
+
+    for (int i = 1; i < LOOP_TOP_AXI_R; i++) begin
         logic [31:0] temp_data;
         ocl_rd32(ADDR_TOP_AXI_R_START + i*4, temp_data);
         #10ns;
