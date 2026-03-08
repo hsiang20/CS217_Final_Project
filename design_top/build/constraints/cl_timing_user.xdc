@@ -17,4 +17,4 @@
 
 
 # Add timing constraints here
-create_clock -name CL_MAIN_CLK -period 10.000 [get_ports clk_main_a0]
+create_clock -name CL_MAIN_CLK -period 4.000 [get_ports clk_main_a0]

@@ -70,7 +70,7 @@ module design_top
   /////////////// YOUR CODE STARTS HERE ///////////////
   Top u_top (
         .clk              (clk_main_a0),
-        .rst              (rst_main_n),
+        .rst              (~rst_main_n),
         .interrupt        (interrupt),
         .if_axi_rd_ar_vld (if_axi_rd_ar_vld),
         .if_axi_rd_ar_rdy (if_axi_rd_ar_rdy),
