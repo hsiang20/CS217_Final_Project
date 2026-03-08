@@ -36,10 +36,10 @@
 //   Memory 1 (dst): base=64, num_vector=3  → dst SRAM addresses 64,65,66,80,81,82
 //
 // Test steps:
-//   (a) Write GBCore memory config (3 managers: src=0, dst_naive=1, dst_diag=2).
+//   (a) Write GBCore memory config (3 managers: src=0, dst_naive=1, dst_banked=2).
 //   (b) Write source matrix to SRAM.
 //   (c) Run transpose opcode 0 (naive): config, start, wait gb_done, read back from dst 1, verify.
-//   (d) Run transpose opcode 1 (diagonal): config, start, wait gb_done, read back from dst 2, verify.
+//   (d) Run transpose opcode 1 (banked BRAM): config, start, wait gb_done, read back from dst 2, verify.
 // =============================================================================
 
 #include "GBModule.h"
@@ -139,7 +139,7 @@ SC_MODULE(Source) {
     // (a) GBCore memory config (region 0x4, local_index 0x01)
     //   Memory 0: num_vector=2, base=0   (source)
     //   Memory 1: num_vector=3, base=64  (naive result)
-    //   Memory 2: num_vector=3, base=128 (diagonal result)
+    //   Memory 2: num_vector=3, base=128 (banked-BRAM result)
     // -----------------------------------------------------------------------
     NVUINTW(128) gbcore_cfg = 0;
     gbcore_cfg.set_slc<8>(0,   NVUINT8(2));    // num_vector[0] = 2
@@ -210,14 +210,14 @@ SC_MODULE(Source) {
     // -----------------------------------------------------------------------
     g_gb_done = false;  // allow second wait_for_gb_done
     xp_cfg.set_slc<3>(16, NVUINT3(2));   // memory_index_dst = 2
-    xp_cfg.set_slc<3>(48, NVUINT3(1));   // opcode = 1 (diagonal)
+    xp_cfg.set_slc<3>(48, NVUINT3(1));   // opcode = 1 (banked BRAM)
     push_rva_write(xp_cfg_addr, xp_cfg);
-    cout << sc_time_stamp() << " [Source] Transpose config written (opcode=1 diagonal)" << endl;
+    cout << sc_time_stamp() << " [Source] Transpose config written (opcode=1 banked BRAM)" << endl;
     push_rva_write(start_addr, 0);
-    cout << sc_time_stamp() << " [Source] Transpose start (diagonal)" << endl;
+    cout << sc_time_stamp() << " [Source] Transpose start (banked BRAM)" << endl;
 
     wait_for_gb_done();
-    cout << sc_time_stamp() << " [Source] gb_done (diagonal), reading back from dst 2" << endl;
+    cout << sc_time_stamp() << " [Source] gb_done (banked BRAM), reading back from dst 2" << endl;
 
     push_rva_read(sram_addr(128));
     push_rva_read(sram_addr(144));
@@ -254,7 +254,7 @@ SC_MODULE(Dest) {
   }
 
   static const int kNumReadsPerTest = 6;
-  static const int kNumTests        = 2;  // naive then diagonal
+  static const int kNumTests        = 2;  // naive then banked BRAM
   uint8_t expected_val[kNumReadsPerTest] = {0x01, 0x03, 0x05, 0x02, 0x04, 0x06};
 
   void RunReadVerify() {
@@ -293,7 +293,7 @@ SC_MODULE(Dest) {
       if (test == 0) g_gb_done = false;  // allow Source to proceed to second transpose
     }
 
-    cout << sc_time_stamp() << " [Dest]   All " << (kNumReadsPerTest * kNumTests) << " reads verified (naive + diagonal)." << endl;
+    cout << sc_time_stamp() << " [Dest]   All " << (kNumReadsPerTest * kNumTests) << " reads verified (naive + banked BRAM)." << endl;
     sc_stop();
   }
 

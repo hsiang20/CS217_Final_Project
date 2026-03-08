@@ -57,20 +57,20 @@ Connections Clock: tb.clk Period: 1 ns
 52 ns [Dest]   Read 0 OK (0x1)
 53 ns [Dest]   Read 1 OK (0x3)
 54 ns [Dest]   Read 2 OK (0x5)
-55 ns [Source] Transpose config written (opcode=1 diagonal)
+55 ns [Source] Transpose config written (opcode=1 banked BRAM)
 55 ns [Dest]   Read 3 OK (0x2)
-56 ns [Source] Transpose start (diagonal)
+56 ns [Source] Transpose start (banked BRAM)
 56 ns [Dest]   Read 4 OK (0x4)
 57 ns [Dest]   Read 5 OK (0x6)
-94 ns [Dest]   gb_done received (test 1)
-95 ns [Source] gb_done (diagonal), reading back from dst 2
-99 ns [Dest]   Read 6 OK (0x1)
-100 ns [Dest]   Read 7 OK (0x3)
-101 ns [Dest]   Read 8 OK (0x5)
-102 ns [Dest]   Read 9 OK (0x2)
-103 ns [Dest]   Read a OK (0x4)
-104 ns [Dest]   Read b OK (0x6)
-104 ns [Dest]   All c reads verified (naive + diagonal).
+96 ns [Dest]   gb_done received (test 1)
+97 ns [Source] gb_done (banked BRAM), reading back from dst 2
+101 ns [Dest]   Read 6 OK (0x1)
+102 ns [Dest]   Read 7 OK (0x3)
+103 ns [Dest]   Read 8 OK (0x5)
+104 ns [Dest]   Read 9 OK (0x2)
+105 ns [Dest]   Read a OK (0x4)
+106 ns [Dest]   Read b OK (0x6)
+106 ns [Dest]   All c reads verified (naive + banked BRAM).
 
 Info: /OSCI/SystemC: Simulation stopped by user.
 TESTBENCH PASS
@@ -101,8 +101,7 @@ TESTBENCH PASS
         Copyright (c) 1996-2018 by all Contributors,
         ALL RIGHTS RESERVED
 
---- Error for src/Top ---
-Command 'make' returned non-zero exit status 2.
+--- Output for src/Top ---
 rm -rf *.o sim_* dump.vcd
 rm -rf build.log
 g++ -o sim_test -DHLS_ALGORITHMICC -Wall -Wno-unknown-pragmas -Wno-virtual-move-assign -Wno-unused-local-typedefs -std=c++11  -I. -I/cad/mentor/2024.2_1/Mgc_home/shared/include -I/cad/xilinx/vitis/2020.1/Vitis/2020.1/cardano/tps/boost_1_64_0 -I/cad/mentor/2024.2_1/Mgc_home/shared/include -I/home/users/hsiangc/cs217/CS217_Final_Project/src/include -I/home/users/hsiangc/cs217/CS217_Final_Project/src -I/cad/mentor/2024.2_1/Mgc_home/shared/pkgs/matchlib_connections/include -I/cad/mentor/2024.2_1/Mgc_home/shared/include -I/cad/mentor/2024.2_1/Mgc_home/shared/pkgs/matchlib/cmod/include -I/cad/xilinx/vitis/2020.1/Vitis/2020.1/cardano/lib/lnx64.o -I/cad/xilinx/vitis/2020.1/Vitis/2020.1/lib/lnx64.o  -L. -L/cad/mentor/2024.2_1/Mgc_home/shared/lib -L/cad/mentor/2024.2_1/Mgc_home/shared/pkgs/boostpp/pp/lib -DHLS_CATAPULT -DCONNECTIONS_ACCURATE_SIM -DSC_INCLUDE_DYNAMIC_PROCESSES testbench.cpp   -lstdc++ -lsystemc -lm -lpthread > build.log 2>&1
@@ -114,10 +113,32 @@ SETTING RANDOM SEED = 19650218
 Connections Clock: tb.clk Period: 1 ns
 @2 ns Asserting reset
 @4 ns De-Asserting reset
-Error: Assertion failed. Read data is X
+120 ns - Interrupt signal issued!
+121 ns - Interrupt signal issued!
+122 ns - Interrupt signal issued!
+123 ns - Interrupt signal issued!
+124 ns - Interrupt signal issued!
+125 ns - Interrupt signal issued!
+126 ns - Interrupt signal issued!
+127 ns - Interrupt signal issued!
+128 ns - Interrupt signal issued!
+129 ns - Interrupt signal issued!
+404 ns - Interrupt signal issued!
+405 ns - Interrupt signal issued!
+406 ns - Interrupt signal issued!
+407 ns - Interrupt signal issued!
+408 ns - Interrupt signal issued!
+409 ns - Interrupt signal issued!
+410 ns - Interrupt signal issued!
+411 ns - Interrupt signal issued!
+412 ns - Interrupt signal issued!
+413 ns - Interrupt signal issued!
+629 ns Manager has finished issuing AXI Writes
+
+Info: /OSCI/SystemC: Simulation stopped by user.
+TESTBENCH PASS
 
         SystemC 2.3.3-Accellera --- Jun  7 2022 13:10:00
         Copyright (c) 1996-2018 by all Contributors,
         ALL RIGHTS RESERVED
-sim_test: /cad/mentor/2024.2_1/Mgc_home/shared/pkgs/matchlib/cmod/include/mem_array.h:130: T mem_array_sep<T, NumEntries, NumBanks, NumByteEnables>::read(mem_array_sep<T, NumEntries, NumBanks, NumByteEnables>::LocalIndex, mem_array_sep<T, NumEntries, NumBanks, NumByteEnables>::BankIndex) [with T = nvhls::nv_scvector<ac_int<8, false>, 16>; int NumEntries = 65536; int NumBanks = 16; int NumByteEnables = 1; mem_array_sep<T, NumEntries, NumBanks, NumByteEnables>::LocalIndex = ac_int<12, false>; mem_array_sep<T, NumEntries, NumBanks, NumByteEnables>::BankIndex = ac_int<4, false>]: Assertion `read_data.xor_reduce()!=sc_logic('X')' failed.
-make: *** [run] Aborted (core dumped)
+

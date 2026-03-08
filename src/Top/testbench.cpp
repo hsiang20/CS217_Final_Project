@@ -52,7 +52,7 @@
 #endif
 
 // Top-level integration: AXI from axi_commands_test.csv runs both transpose opcodes
-// (0 = naive, 1 = diagonal), verifies read-back for each; pass when interrupt and manager done.
+// (0 = naive, 1 = banked BRAM), verifies read-back for each; pass when interrupt and manager done.
 bool correct = true;
 bool axiManagerDone = false;
 

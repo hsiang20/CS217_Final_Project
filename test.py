@@ -90,9 +90,15 @@ def rtl_sim():
     os.makedirs(reports_dir, exist_ok=True)
     log_file = os.path.join(reports_dir, "rtl_sim.log.txt")
 
-    # List of directories to run HLS synthesis in (transpose-related only).
+    # Full bottom-up HLS synthesis order (PE-side + GB-side + Top).
     make_dirs = [
+        "hls/Top/PEPartition/PEModule/PECore",
+        "hls/Top/PEPartition/PEModule/ActUnit",
+        "hls/Top/PEPartition/PEModule",
+        "hls/Top/PEPartition",
+        "hls/Top/GBPartition/GBModule/NMP",
         "hls/Top/GBPartition/GBModule/GBCore",
+        "hls/Top/GBPartition/GBModule/GBControl",
         "hls/Top/GBPartition/GBModule",
         "hls/Top/GBPartition",
         "hls/Top",

@@ -33,7 +33,7 @@
 //   bits [18:16]  : memory_index_dst  (destination memory manager)
 //   bits [39:32]  : num_rows   (rows in the source matrix)
 //   bits [47:40]  : num_cols   (VectorType columns per row in source)
-//   bits [50:48]  : opcode     0 = naive (original), 1 = diagonal (efficient)
+//   bits [50:48]  : opcode     0 = naive (original), 1 = banked BRAM (fill/drain)
 // ============================================================
 class TransposeConfig {
   static const int write_width = 128;
@@ -44,7 +44,7 @@ class TransposeConfig {
   NVUINT3 memory_index_dst;
   NVUINT8 num_rows;
   NVUINT8 num_cols;
-  NVUINT3 opcode;  // 0 = naive, 1 = diagonal (BRAM by anti-diagonals)
+  NVUINT3 opcode;  // 0 = naive, 1 = banked BRAM (fill/drain)
 
   // Runtime counters – not part of the AXI config register
   NVUINT8 row_counter;
@@ -113,9 +113,14 @@ class TransposeConfig {
 //
 // Opcode 0 (naive): Read A[row][col], write A^T[col][row] element-by-element.
 //
-// Opcode 1 (diagonal): Address unit processes by anti-diagonals.
-//   For each anti-diagonal d (i+j=d), read all A[i][d-i] into local BRAM,
-//   then read back from BRAM and write A^T[d-i][i]. Better locality.
+// Opcode 1 (banked BRAM):
+//   Uses kNumBramBanks local BRAM banks with diagonal banking:
+//     A[r][c] → bank (r+c) % kNumBramBanks, address r.
+//   This ensures all elements of any single row (or column) reside in
+//   distinct banks, enabling conflict-free parallel access.
+//
+//   Fill phase:  read entire source matrix from GBCore into local BRAMs.
+//   Drain phase: read from local BRAMs in transposed order, write to dest.
 //
 // Matrix layout in GBCore SRAM (via DataReq addressing):
 //   Element A[r][c]  →  (memory_index=src, timestep=r, vector=c)
@@ -124,7 +129,8 @@ class TransposeConfig {
 // AXI address region: 0x6, local_index 0x01. Start: region 0x0, local_index 0x3.
 // ============================================================
 
-static const unsigned int kMaxDiagLen = 32;  // max anti-diagonal length (min(R,C))
+static const unsigned int kNumBramBanks = 32;  // max(R, C) must be ≤ this
+static const unsigned int kBramBankDepth = 32;  // max(R, C) must be ≤ this
 
 class Transpose : public match::Module {
   static const int kDebugLevel = 3;
@@ -144,12 +150,15 @@ class Transpose : public match::Module {
   Connections::In<spec::GB::Large::DataRsp<1>>  large_rsp;
 
   // --------------------------------------------------------
-  // FSM: naive path (READ, WAIT_RSP, WRITE, NEXT, FIN) and diagonal path
+  // FSM: naive path (READ, WAIT_RSP, WRITE, NEXT, FIN)
+  //      banked-BRAM path (FILL_READ, FILL_WAIT, FILL_NEXT,
+  //                        DRAIN_READ_BRAM, DRAIN_WRITE, DRAIN_NEXT)
   // --------------------------------------------------------
   enum FSM {
     IDLE,
     READ, WAIT_RSP, WRITE, NEXT, FIN,
-    DIAG_START, DIAG_READ, DIAG_READ_WAIT, DIAG_WRITE, DIAG_NEXT
+    FILL_READ, FILL_WAIT, FILL_NEXT,
+    DRAIN_READ_BRAM, DRAIN_WRITE, DRAIN_NEXT
   };
   FSM state;
 
@@ -160,13 +169,12 @@ class Transpose : public match::Module {
   spec::Axi::SubordinateToRVA::Read rva_out_reg;
   spec::GB::Large::WordType         read_data;
 
-  // Diagonal (efficient) path: local BRAM + address-unit state
-  spec::GB::Large::WordType diag_bram[kMaxDiagLen];
-  NVUINT16 diag_d;       // current anti-diagonal index (i+j = d)
-  NVUINT8  diag_i_lo;    // first row index for this diagonal
-  NVUINT8  diag_len;     // number of elements in this diagonal
-  NVUINT8  diag_in_idx;  // index into diag_bram when storing reads
-  NVUINT8  diag_out_idx; // index when writing from diag_bram to dest
+  // Local BRAM for opcode-1 transpose.
+  // Stored as flat NVUINTW(128) so Catapult maps to a single wide BRAM
+  // instead of decomposing nv_scvector into 16 separate 8-bit sub-memories.
+  static const unsigned int kBramSize = kNumBramBanks * kBramBankDepth;
+  static const unsigned int kWordWidth = spec::kVectorSize * spec::kIntWordWidth;
+  NVUINTW(kWordWidth) bram_flat[kBramSize];
 
   Transpose(sc_module_name nm)
       : match::Module(nm),
@@ -185,11 +193,6 @@ class Transpose : public match::Module {
     state    = IDLE;
     is_start = 0;
     config.Reset();
-    diag_d       = 0;
-    diag_i_lo    = 0;
-    diag_len     = 0;
-    diag_in_idx  = 0;
-    diag_out_idx = 0;
     rva_in.Reset();
     rva_out.Reset();
     start.Reset();
@@ -198,25 +201,31 @@ class Transpose : public match::Module {
     large_rsp.Reset();
   }
 
-  // Compute start row and length for anti-diagonal d (indices (i, d-i)).
-  void DiagBounds(NVUINT16 d, NVUINT8& i_lo, NVUINT8& len) const {
-    NVUINT8 R = config.num_rows;
-    NVUINT8 C = config.num_cols;
-    int di = (int)d;
-    int ri = (int)R;
-    int ci = (int)C;
-    int i_lo_int = (di >= ci) ? (di - ci + 1) : 0;
-    if (i_lo_int < 0) i_lo_int = 0;
-    int i_hi_int = (di < ri) ? di : (ri - 1);
-    if (i_hi_int >= ri) i_hi_int = ri - 1;
-    if (i_lo_int > i_hi_int) {
-      i_lo = 0;
-      len  = 0;
-      return;
+  // Diagonal banking: A[r][c] → flat BRAM address.
+  // bank = (r+c) % kNumBramBanks, flat addr = bank * kBramBankDepth + r.
+  NVUINT16 BramAddr(NVUINT8 row, NVUINT8 col) const {
+    NVUINT8 bank = (NVUINT8)((row + col) % kNumBramBanks);
+    return (NVUINT16)(bank * kBramBankDepth + row);
+  }
+
+  // Pack nv_scvector<uint8,16> → flat NVUINTW(128) for BRAM storage.
+  NVUINTW(kWordWidth) PackWord(const spec::GB::Large::WordType& vec) const {
+    NVUINTW(kWordWidth) result = 0;
+    #pragma hls_unroll yes
+    for (int i = 0; i < spec::kVectorSize; i++) {
+      result.set_slc(i * spec::kIntWordWidth, (NVUINTW(spec::kIntWordWidth))vec[i]);
     }
-    i_lo = (NVUINT8)i_lo_int;
-    len  = (NVUINT8)(i_hi_int - i_lo_int + 1);
-    if (len > kMaxDiagLen) len = kMaxDiagLen;
+    return result;
+  }
+
+  // Unpack flat NVUINTW(128) → nv_scvector<uint8,16>.
+  spec::GB::Large::WordType UnpackWord(const NVUINTW(kWordWidth)& val) const {
+    spec::GB::Large::WordType result;
+    #pragma hls_unroll yes
+    for (int i = 0; i < spec::kVectorSize; i++) {
+      result[i] = nvhls::get_slc<spec::kIntWordWidth>(val, i * spec::kIntWordWidth);
+    }
+    return result;
   }
 
   void Initialize() { w_axi_rsp = 0; }
@@ -289,49 +298,43 @@ class Transpose : public match::Module {
         break;
       }
 
-      // --- Diagonal (efficient) path: address unit + BRAM ---
-      case DIAG_START: {
-        DiagBounds(diag_d, diag_i_lo, diag_len);
-        diag_in_idx  = 0;
-        diag_out_idx = 0;
-        break;
-      }
-
-      case DIAG_READ: {
-        // Read A[i][d-i] into BRAM: (row,col) = (diag_i_lo + diag_in_idx, d - (diag_i_lo + diag_in_idx))
-        NVUINT8 row = diag_i_lo + diag_in_idx;
-        NVUINT8 col = (NVUINT8)(diag_d - (NVUINT16)row);
+      // --- Banked-BRAM path: fill from src, then drain to dst ---
+      case FILL_READ: {
         req.is_write       = 0;
         req.memory_index   = config.memory_index_src;
-        req.vector_index   = col;
-        req.timestep_index = row;
+        req.vector_index   = config.col_counter;
+        req.timestep_index = config.row_counter;
         req.write_data     = 0;
         large_req.Push(req);
         break;
       }
 
-      case DIAG_READ_WAIT: {
+      case FILL_WAIT: {
         spec::GB::Large::DataRsp<1> rsp = large_rsp.Pop();
-        diag_bram[diag_in_idx] = rsp.read_vector[0];
-        diag_in_idx++;
+        NVUINT16 addr = BramAddr(config.row_counter, config.col_counter);
+        bram_flat[addr] = PackWord(rsp.read_vector[0]);
         break;
       }
 
-      case DIAG_WRITE: {
-        // Write from BRAM to A^T[col][row]: (col, row) = (d - (i_lo + out_idx), i_lo + out_idx)
-        NVUINT8 row = diag_i_lo + diag_out_idx;
-        NVUINT8 col = (NVUINT8)(diag_d - (NVUINT16)row);
+      case FILL_NEXT: break;
+
+      case DRAIN_READ_BRAM: {
+        NVUINT16 addr = BramAddr(config.row_counter, config.col_counter);
+        read_data = UnpackWord(bram_flat[addr]);
+        break;
+      }
+
+      case DRAIN_WRITE: {
         req.is_write       = 1;
         req.memory_index   = config.memory_index_dst;
-        req.vector_index   = row;   // A^T vector_index = row of original
-        req.timestep_index = col;   // A^T timestep_index = col of original
-        req.write_data     = diag_bram[diag_out_idx];
+        req.vector_index   = config.row_counter;
+        req.timestep_index = config.col_counter;
+        req.write_data     = read_data;
         large_req.Push(req);
-        diag_out_idx++;
         break;
       }
 
-      case DIAG_NEXT: break;
+      case DRAIN_NEXT: break;
 
       default: break;
     }
@@ -341,7 +344,7 @@ class Transpose : public match::Module {
     FSM next;
     switch (state) {
       case IDLE:
-        next = is_start ? (config.opcode == 0 ? READ : DIAG_START) : IDLE;
+        next = is_start ? (config.opcode == 0 ? READ : FILL_READ) : IDLE;
         break;
       case READ:     next = WAIT_RSP; break;
       case WAIT_RSP: next = WRITE;   break;
@@ -353,26 +356,18 @@ class Transpose : public match::Module {
       }
       case FIN: next = IDLE; break;
 
-      case DIAG_START:
-        next = (diag_len == 0) ? DIAG_NEXT : DIAG_READ;
+      case FILL_READ:  next = FILL_WAIT; break;
+      case FILL_WAIT:  next = FILL_NEXT; break;
+      case FILL_NEXT: {
+        bool all_read = config.Advance();
+        next = all_read ? DRAIN_READ_BRAM : FILL_READ;
         break;
-      case DIAG_READ:
-        next = DIAG_READ_WAIT;
-        break;
-      case DIAG_READ_WAIT:
-        next = (diag_in_idx >= diag_len) ? DIAG_WRITE : DIAG_READ;
-        break;
-      case DIAG_WRITE:
-        next = (diag_out_idx >= diag_len) ? DIAG_NEXT : DIAG_WRITE;
-        break;
-      case DIAG_NEXT: {
-        NVUINT16 max_d = (NVUINT16)config.num_rows + (NVUINT16)config.num_cols - 1;
-        if (diag_d >= max_d) {
-          next = FIN;
-        } else {
-          diag_d++;
-          next = DIAG_START;
-        }
+      }
+      case DRAIN_READ_BRAM: next = DRAIN_WRITE; break;
+      case DRAIN_WRITE:     next = DRAIN_NEXT; break;
+      case DRAIN_NEXT: {
+        bool all_written = config.Advance();
+        next = all_written ? FIN : DRAIN_READ_BRAM;
         break;
       }
 

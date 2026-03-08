@@ -1,0 +1,108 @@
+\documentclass{article}
+\usepackage[final]{nips_2017}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{hyperref}
+\usepackage{url}
+\usepackage{booktabs}
+
+\title{Efficient Matrix Transpose for ML Workloads (Checkpoint)}
+
+\author{
+  Yiming Tan\\
+  \texttt{yimingt@stanford.edu} \\
+  \And
+  Chia-Hsiang Chang \\
+  \texttt{hsiangc@stanford.edu} \\
+}
+
+
+\begin{document}
+\maketitle
+
+%------------------------------------------------------------------------------
+\section{Overview}
+%------------------------------------------------------------------------------
+We adapted the code structure from lab4.
+
+SystemC verification for the transpose module is done. Both the baseline and the optimized (diagonal) transpose are verified at GBModule and Top level.
+
+%------------------------------------------------------------------------------
+\section{Checkpoints}
+%------------------------------------------------------------------------------
+\subsection{Original (Naive) Method}
+
+\begin{itemize}
+  \item \textbf{Done.} Transpose via element-by-element read/write in column-major order (opcode 0).
+  \item Config selects src/dst and dimensions.
+\end{itemize}
+
+%------------------------------------------------------------------------------
+\subsection{Diagonal (Efficient) Method}
+
+\begin{itemize}
+  \item \textbf{Done.} Transpose by anti-diagonals using local BRAM for better locality (opcode 1).
+  \item Config selects src/dst and dimensions.
+  \item Same AXI config interface; opcode bit selects naive vs.\ diagonal.
+\end{itemize}
+
+%------------------------------------------------------------------------------
+\subsection{Test Design and Coverage}
+
+\begin{itemize}
+  \item \textbf{GBModule testbench:} Exercises both opcodes on a $3\times2$ matrix; writes source, runs naive then diagonal, reads back and verifies all 6 elements for each.
+  \item \textbf{Top-level test:} CSV-driven AXI sequence runs the same flow at Top; pass on interrupt and no errors.
+  \item \textbf{Automation:} \texttt{test.py} runs SystemC (and RTL) \texttt{make} for GBCore, GBModule, GBPartition, and Top; logs to \texttt{reports/hls/}.
+\end{itemize}
+
+%------------------------------------------------------------------------------
+\section{SystemC Test Logic}
+\label{sec:systemc}
+%------------------------------------------------------------------------------
+
+\subsection{Hierarchy and automation}
+
+SystemC tests are run in four levels: \texttt{GBCore} $\rightarrow$ \texttt{GBModule} $\rightarrow$ \texttt{GBPartition} $\rightarrow$ \texttt{Top}. The script \texttt{test.py} invokes \texttt{make} in each corresponding source (or HLS) directory, captures stdout/stderr to \texttt{reports/hls/systemc.log.txt}, and marks a level \textbf{PASSED} if the string ``TESTBENCH PASS'' appears in stdout; otherwise \textbf{FAILED}. Build failures or timeouts are logged and also count as FAILED.
+
+\subsection{GBModule testbench}
+
+\begin{itemize}
+  \item \textbf{Source thread:} Drives the AXI-RVA (config) and SRAM data path. It (a) writes GBCore memory-manager config (three regions: src, dst for naive, dst for diagonal), (b) writes the $3\times2$ source matrix to SRAM via direct RVA writes, (c) writes Transpose config (opcode 0, dst = manager 1), asserts start, then \textbf{blocks} until a global \texttt{gb\_done} flag is set by the Dest. It then issues 6 RVA reads from the naive-destination region. Next it clears \texttt{gb\_done}, writes Transpose config (opcode 1, dst = manager 2), starts again, blocks on \texttt{gb\_done}, and issues 6 RVA reads from the diagonal-destination region.
+  \item \textbf{Dest thread:} Listens for \texttt{gb\_done}. For each of the two tests (naive, then diagonal), it waits until \texttt{gb\_done} is received and sets the global flag so Source can proceed. It then drains exactly 6 AXI read responses and compares each to the expected transpose values $(0x01, 0x03, 0x05, 0x02, 0x04, 0x06)$. On any mismatch it calls \texttt{SC\_REPORT\_ERROR} and records failure; after 12 reads it calls \texttt{sc\_stop()}.
+  \item \textbf{Pass/fail:} \texttt{sc\_main} checks \texttt{sc\_report\_handler::get\_count(SC\_ERROR)}; zero errors $\Rightarrow$ print ``TESTBENCH PASS'', else ``TESTBENCH FAIL'' and non-zero return code. A separate timeout thread aborts the run if neither test completes within the allotted time.
+\end{itemize}
+
+\subsection{Top-level testbench}
+
+\begin{itemize}
+  \item An AXI master (\texttt{ManagerFromFile}) reads \texttt{axi\_commands\_test.csv} and issues AXI writes/reads (config, source data, Transpose config for opcode 0, start, read-backs; then config for opcode 1, start, read-backs). The DUT is the full \texttt{Top}; the Dest module only monitors the \textbf{interrupt} line.
+  \item \textbf{Run logic:} After de-asserting reset, the testbench waits until \texttt{master\_done} is true (CSV sequence finished). It then waits up to 5\,s for at least one interrupt; if none occurs, it reports a timeout and fails. Pass means no \texttt{SC\_ERROR} and interrupt received; exit code is derived from the error count as in GBModule.
+\end{itemize}
+
+\begin{table}[h]
+  \centering
+  \begin{tabular}{@{}ll@{}}
+    \toprule
+    Item & Status \\
+    \midrule
+    Naive transpose (opcode 0) & Done \\
+    Diagonal transpose (opcode 1) & Done \\
+    Config, start/done, read-back & Both testbenches \\
+    SystemC verification & Done (GBModule + Top; \texttt{test.py}) \\
+    \bottomrule
+  \end{tabular}
+  \caption{Checkpoint summary.}
+\end{table}
+
+%------------------------------------------------------------------------------
+\section{Future Work}
+%------------------------------------------------------------------------------
+Aligned with the proposal (Efficient Matrix Transpose for ML Workloads):
+
+\begin{enumerate}
+  \item \textbf{Demonstrate advantage over baseline.} Quantify that the diagonal method is better than the naive method (e.g., cycle count, memory traffic, or synthesis area/latency from HLS/FPGA reports).
+  \item \textbf{Fuse transpose with matrix multiplication.} Integrate the transpose unit into a matrix-multiplication datapath so that transposed operands can be produced on-chip without extra round-trips to external memory.
+  \item \textbf{Integrate into attention.} Use the fused transpose--matmul block inside an attention backend (e.g., as part of $QK^T$ or score$\times V$) to accelerate transformer-style workloads on FPGA.
+\end{enumerate}
+
+\end{document}
