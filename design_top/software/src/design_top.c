@@ -157,6 +157,7 @@ static int run_transpose_test(int bh, const char* label,
     AxiWriteCommand wcmd;
     AxiReadCommand  rcmd;
     uint8_t val;
+    uint32_t cyc_before, cyc_after, naive_cycles, opt_cycles;
 
     printf("\n=========================================================\n");
     printf(" Test: %s  (%dx%d)  src=%d  naive_dst=%d  opt_dst=%d\n",
@@ -182,10 +183,13 @@ static int run_transpose_test(int bh, const char* label,
     if (top_write(bh, &wcmd)) rc = 1;
     usleep(10);
 
+    ocl_rd32(bh, ADDR_TOP_INTERRUPT, &cyc_before);
     wcmd.addr = 0x33000030;
     memset(wcmd.data, 0, sizeof(wcmd.data));
     if (top_write(bh, &wcmd)) rc = 1;
     usleep(1000);
+    ocl_rd32(bh, ADDR_TOP_INTERRUPT, &cyc_after);
+    naive_cycles = cyc_after - cyc_before;
 
     printf("  Verifying naive result (mem=%d) ...\n", dst_naive);
     for (int r = 0; r < rows; r++) {
@@ -198,6 +202,7 @@ static int run_transpose_test(int bh, const char* label,
             usleep(10);
         }
     }
+    printf("  Naive interrupt cycles: %u\n", naive_cycles);
 
     // --- Optimized transpose (opcode 1) ---
     printf("  Running optimized transpose (opcode 1, banked BRAM) ...\n");
@@ -206,10 +211,13 @@ static int run_transpose_test(int bh, const char* label,
     if (top_write(bh, &wcmd)) rc = 1;
     usleep(10);
 
+    ocl_rd32(bh, ADDR_TOP_INTERRUPT, &cyc_before);
     wcmd.addr = 0x33000030;
     memset(wcmd.data, 0, sizeof(wcmd.data));
     if (top_write(bh, &wcmd)) rc = 1;
     usleep(1000);
+    ocl_rd32(bh, ADDR_TOP_INTERRUPT, &cyc_after);
+    opt_cycles = cyc_after - cyc_before;
 
     printf("  Verifying optimized result (mem=%d) ...\n", dst_opt);
     for (int r = 0; r < rows; r++) {
@@ -222,6 +230,11 @@ static int run_transpose_test(int bh, const char* label,
             usleep(10);
         }
     }
+    printf("  Optimized interrupt cycles: %u\n", opt_cycles);
+
+    printf("  >> %s (%dx%d): naive=%u cyc, optimized=%u cyc, speedup=%.2fx\n",
+           label, rows, cols, naive_cycles, opt_cycles,
+           opt_cycles > 0 ? (double)naive_cycles / opt_cycles : 0.0);
 
     return rc;
 }

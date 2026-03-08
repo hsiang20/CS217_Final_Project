@@ -158,7 +158,8 @@ import tb_type_defines_pkg::*;
 
     logic [127:0] cfg;
     logic [7:0]   val;
-    realtime t0, t1;
+    logic [31:0]  cyc_before, cyc_after;
+    logic [31:0]  naive_cycles, opt_cycles;
 
     $display("\n=========================================================");
     $display(" Test: %s  (%0d x %0d)  src=%0d  naive_dst=%0d  opt_dst=%0d",
@@ -178,10 +179,11 @@ import tb_type_defines_pkg::*;
     $display("  Running naive transpose (opcode 0) ...");
     cfg = transpose_cfg(src_mem, dst_naive, rows, cols, 0);
     write_sram(32'h33600010, cfg);
-    t0 = $realtime;
+    ocl_rd32(ADDR_TOP_INTERRUPT, cyc_before);
     write_sram(32'h33000030, 128'h0);
     #5000ns;
-    t1 = $realtime;
+    ocl_rd32(ADDR_TOP_INTERRUPT, cyc_after);
+    naive_cycles = cyc_after - cyc_before;
 
     $display("  Verifying naive result (mem=%0d) ...", dst_naive);
     for (int r = 0; r < rows; r++) begin
@@ -190,16 +192,17 @@ import tb_type_defines_pkg::*;
         verify_sram(sram_addr(dst_naive, r, c), replicate8(val));
       end
     end
-    $display("  Naive wall time: %0t", t1 - t0);
+    $display("  Naive interrupt cycles: %0d", naive_cycles);
 
     // --- Optimized transpose (opcode 1) ---
     $display("  Running optimized transpose (opcode 1, banked BRAM) ...");
     cfg = transpose_cfg(src_mem, dst_opt, rows, cols, 1);
     write_sram(32'h33600010, cfg);
-    t0 = $realtime;
+    ocl_rd32(ADDR_TOP_INTERRUPT, cyc_before);
     write_sram(32'h33000030, 128'h0);
     #5000ns;
-    t1 = $realtime;
+    ocl_rd32(ADDR_TOP_INTERRUPT, cyc_after);
+    opt_cycles = cyc_after - cyc_before;
 
     $display("  Verifying optimized result (mem=%0d) ...", dst_opt);
     for (int r = 0; r < rows; r++) begin
@@ -208,7 +211,12 @@ import tb_type_defines_pkg::*;
         verify_sram(sram_addr(dst_opt, r, c), replicate8(val));
       end
     end
-    $display("  Optimized wall time: %0t", t1 - t0);
+    $display("  Optimized interrupt cycles: %0d", opt_cycles);
+
+    // --- Performance comparison ---
+    $display("  >> %s (%0dx%0d): naive=%0d cyc, optimized=%0d cyc, speedup=%.2fx",
+             label, rows, cols, naive_cycles, opt_cycles,
+             real'(naive_cycles) / real'(opt_cycles));
   endtask
 
   // =========================================================================
