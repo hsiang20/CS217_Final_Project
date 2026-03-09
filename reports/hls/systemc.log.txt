@@ -62,15 +62,15 @@ Connections Clock: tb.clk Period: 1 ns
 56 ns [Source] Transpose start (banked BRAM)
 56 ns [Dest]   Read 4 OK (0x4)
 57 ns [Dest]   Read 5 OK (0x6)
-96 ns [Dest]   gb_done received (test 1)
-97 ns [Source] gb_done (banked BRAM), reading back from dst 2
-101 ns [Dest]   Read 6 OK (0x1)
-102 ns [Dest]   Read 7 OK (0x3)
-103 ns [Dest]   Read 8 OK (0x5)
-104 ns [Dest]   Read 9 OK (0x2)
-105 ns [Dest]   Read a OK (0x4)
-106 ns [Dest]   Read b OK (0x6)
-106 ns [Dest]   All c reads verified (naive + banked BRAM).
+85 ns [Dest]   gb_done received (test 1)
+86 ns [Source] gb_done (banked BRAM), reading back from dst 2
+90 ns [Dest]   Read 6 OK (0x1)
+91 ns [Dest]   Read 7 OK (0x3)
+92 ns [Dest]   Read 8 OK (0x5)
+93 ns [Dest]   Read 9 OK (0x2)
+94 ns [Dest]   Read a OK (0x4)
+95 ns [Dest]   Read b OK (0x6)
+95 ns [Dest]   All c reads verified (naive + banked BRAM).
 
 Info: /OSCI/SystemC: Simulation stopped by user.
 TESTBENCH PASS
@@ -123,16 +123,16 @@ Connections Clock: tb.clk Period: 1 ns
 127 ns - Interrupt signal issued!
 128 ns - Interrupt signal issued!
 129 ns - Interrupt signal issued!
-404 ns - Interrupt signal issued!
-405 ns - Interrupt signal issued!
-406 ns - Interrupt signal issued!
-407 ns - Interrupt signal issued!
-408 ns - Interrupt signal issued!
-409 ns - Interrupt signal issued!
-410 ns - Interrupt signal issued!
-411 ns - Interrupt signal issued!
-412 ns - Interrupt signal issued!
-413 ns - Interrupt signal issued!
+393 ns - Interrupt signal issued!
+394 ns - Interrupt signal issued!
+395 ns - Interrupt signal issued!
+396 ns - Interrupt signal issued!
+397 ns - Interrupt signal issued!
+398 ns - Interrupt signal issued!
+399 ns - Interrupt signal issued!
+400 ns - Interrupt signal issued!
+401 ns - Interrupt signal issued!
+402 ns - Interrupt signal issued!
 629 ns Manager has finished issuing AXI Writes
 
 Info: /OSCI/SystemC: Simulation stopped by user.

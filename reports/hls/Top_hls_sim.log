@@ -1,7 +1,7 @@
 Command: /home/users/hsiangc/cs217/CS217_Final_Project/hls/Top/./Catapult/Top.v1/scverify/concat_sim_Top_v_vcs/sc_mainpwr -systemcrun -verilogrun -cm assert -ucli -ucli2Proc -i ./Catapult/Top.v1/scverify/concat_sim_Top_v_vcs/scverify_vcs_wave.tcl -l ./Catapult/Top.v1/scverify/concat_sim_Top_v_vcs/sim.log
 Chronologic VCS simulator copyright 1991-2023
 Contains Synopsys proprietary information.
-Compiler version U-2023.03_Full64; Runtime version U-2023.03_Full64;  Mar  8 15:38 2026
+Compiler version U-2023.03_Full64; Runtime version U-2023.03_Full64;  Mar  8 18:09 2026
 Connections Clock: tb.clk Period: 1 ns
 ucli% # Source static function file
 ucli% global env
@@ -179,5 +179,5 @@ Turning FSDB off and flushing
 Completed writing FSDB file ./default.fsdb...
            V C S   S i m u l a t i o n   R e p o r t 
 Time: 393000 ps
-CPU Time:      1.750 seconds;       Data structure size:  15.3Mb
-Sun Mar  8 15:38:18 2026
+CPU Time:      1.690 seconds;       Data structure size:  15.7Mb
+Sun Mar  8 18:09:29 2026

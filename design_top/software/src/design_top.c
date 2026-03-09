@@ -16,10 +16,11 @@
 // Transpose Test Application for design_top on AWS F2 FPGA
 // ============================================================================
 // Exercises both transpose opcodes (naive / banked-BRAM) at multiple matrix
-// sizes: 1x1, 2x3, 3x2, 4x4.
+// sizes: 3x2, 4x4, 8x4, 8x8, 16x16.
 //
-// SRAM address encoding:
-//   0x33500000 + memory_index*0x400 + vector_index*0x100 + timestep_index*0x10
+// SRAM flat address = base_large[mem] + ts + vec * 16  (for ts < 16)
+// AXI  address      = 0x33500000 + flat * 0x10
+// With base_large = {0, 256, 512}: mem stride = 0x1000
 //
 // Matrix element A[r][c] is stored at (timestep=r, vector=c).
 // After transpose, A[r][c] appears at dst (timestep=c, vector=r).
@@ -127,7 +128,7 @@ int top_read(int bh, AxiReadCommand* cmd) {
 // ============================================================================
 
 static uint32_t sram_addr(int mem, int vec, int ts) {
-    return 0x33500000 + mem * 0x400 + vec * 0x100 + ts * 0x10;
+    return 0x33500000 + mem * 0x1000 + vec * 0x100 + ts * 0x10;
 }
 
 static void fill_vector(uint32_t data[4], uint8_t val) {
@@ -146,7 +147,7 @@ static void make_transpose_cfg(uint32_t data[4],
 // ============================================================================
 // Run one transpose test (both opcodes) for a given matrix size
 //
-//   Source A[r][c] at (timestep=r, vector=c), value = r*cols+c+1
+//   Source A[r][c] at (timestep=r, vector=c), value = (r*cols+c)%255+1
 //   After transpose: A[r][c] at dst (timestep=c, vector=r)
 // ============================================================================
 
@@ -168,7 +169,7 @@ static int run_transpose_test(int bh, const char* label,
     printf("  Writing source matrix ...\n");
     for (int r = 0; r < rows; r++) {
         for (int c = 0; c < cols; c++) {
-            val = r * cols + c + 1;
+            val = (uint8_t)((r * cols + c) % 255 + 1);
             wcmd.addr = sram_addr(src_mem, c, r);
             fill_vector(wcmd.data, val);
             if (top_write(bh, &wcmd)) rc = 1;
@@ -187,14 +188,14 @@ static int run_transpose_test(int bh, const char* label,
     wcmd.addr = 0x33000030;
     memset(wcmd.data, 0, sizeof(wcmd.data));
     if (top_write(bh, &wcmd)) rc = 1;
-    usleep(1000);
+    usleep(1000 + rows * cols * 10);
     ocl_rd32(bh, ADDR_TOP_INTERRUPT, &cyc_after);
     naive_cycles = cyc_after - cyc_before;
 
     printf("  Verifying naive result (mem=%d) ...\n", dst_naive);
     for (int r = 0; r < rows; r++) {
         for (int c = 0; c < cols; c++) {
-            val = r * cols + c + 1;
+            val = (uint8_t)((r * cols + c) % 255 + 1);
             rcmd.addr = sram_addr(dst_naive, r, c);
             memset(rcmd.data, 0, sizeof(rcmd.data));
             fill_vector(rcmd.expected_read_data, val);
@@ -215,14 +216,14 @@ static int run_transpose_test(int bh, const char* label,
     wcmd.addr = 0x33000030;
     memset(wcmd.data, 0, sizeof(wcmd.data));
     if (top_write(bh, &wcmd)) rc = 1;
-    usleep(1000);
+    usleep(1000 + rows * cols * 10);
     ocl_rd32(bh, ADDR_TOP_INTERRUPT, &cyc_after);
     opt_cycles = cyc_after - cyc_before;
 
     printf("  Verifying optimized result (mem=%d) ...\n", dst_opt);
     for (int r = 0; r < rows; r++) {
         for (int c = 0; c < cols; c++) {
-            val = r * cols + c + 1;
+            val = (uint8_t)((r * cols + c) % 255 + 1);
             rcmd.addr = sram_addr(dst_opt, r, c);
             memset(rcmd.data, 0, sizeof(rcmd.data));
             fill_vector(rcmd.expected_read_data, val);
@@ -264,16 +265,18 @@ int main(int argc, char** argv) {
     printf("---- System Initialization (bar_handle: %d) ----\n", bar_handle);
 
     // GBControl configuration (required before any GB operations)
+    // base_large = {0, 256, 512}, num_vector_large = 16 for all regions
     printf("\n===== GBControl config =====\n");
-    AxiWriteCommand gb_cfg = {0x33400010, {0x00000002, 0x00400003, 0x00800003, 0x00000000}};
+    AxiWriteCommand gb_cfg = {0x33400010, {0x00000010, 0x01000010, 0x02000010, 0x00000000}};
     if (top_write(bar_handle, &gb_cfg)) rc = 1;
     usleep(10);
 
     // ---- Test suite: multiple matrix sizes ----
-    if (run_transpose_test(bar_handle, "1x1", 1, 1, 0, 1, 2)) rc = 1;
-    if (run_transpose_test(bar_handle, "2x3", 2, 3, 0, 1, 2)) rc = 1;
-    if (run_transpose_test(bar_handle, "3x2", 3, 2, 0, 1, 2)) rc = 1;
-    if (run_transpose_test(bar_handle, "4x4", 4, 4, 0, 1, 2)) rc = 1;
+    if (run_transpose_test(bar_handle, "3x2",   3,  2, 0, 1, 2)) rc = 1;
+    if (run_transpose_test(bar_handle, "4x4",   4,  4, 0, 1, 2)) rc = 1;
+    if (run_transpose_test(bar_handle, "8x4",   8,  4, 0, 1, 2)) rc = 1;
+    if (run_transpose_test(bar_handle, "8x8",   8,  8, 0, 1, 2)) rc = 1;
+    if (run_transpose_test(bar_handle, "16x16", 16, 16, 0, 1, 2)) rc = 1;
 
     // Read interrupt counter
     uint32_t interrupt_cycles = 0;

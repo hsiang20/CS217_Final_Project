@@ -101,9 +101,12 @@ import tb_type_defines_pkg::*;
   // Helpers
   // =========================================================================
 
-  // SRAM address: 0x33500000 + mem*0x400 + vec*0x100 + ts*0x10
+  // SRAM flat address matching GBCore's SetLargeBuffer (for timestep < 16):
+  //   flat = base_large[mem] + ts + vec * 16
+  //   AXI  = 0x33500000 + flat * 0x10
+  // With base_large = {0, 256, 512}: mem stride = 0x1000
   function automatic logic [31:0] sram_addr(int mem, int vec, int ts);
-    return 32'h33500000 + mem[31:0] * 32'h400
+    return 32'h33500000 + mem[31:0] * 32'h1000
                         + vec[31:0] * 32'h100
                         + ts[31:0]  * 32'h10;
   endfunction
@@ -147,9 +150,10 @@ import tb_type_defines_pkg::*;
   //
   //   Source matrix A (rows x cols) at memory_index = src_mem
   //     A[r][c] stored at SRAM(timestep=r, vector=c)
-  //     All 16 bytes of A[r][c] = (r*cols + c + 1)
   //
   //   After transpose, A[r][c] appears at dst(timestep=c, vector=r)
+  //
+  //   Element value = (r*cols + c) % 255 + 1  → always in [1, 255], never zero
   // =========================================================================
   task automatic run_transpose_test(
       input string label,
@@ -160,17 +164,22 @@ import tb_type_defines_pkg::*;
     logic [7:0]   val;
     logic [31:0]  cyc_before, cyc_after;
     logic [31:0]  naive_cycles, opt_cycles;
+    int           wait_ns;
 
     $display("\n=========================================================");
     $display(" Test: %s  (%0d x %0d)  src=%0d  naive_dst=%0d  opt_dst=%0d",
              label, rows, cols, src_mem, dst_naive, dst_opt);
     $display("=========================================================");
 
+    // Scale wait time: ~200ns per element, minimum 5000ns
+    wait_ns = rows * cols * 200;
+    if (wait_ns < 5000) wait_ns = 5000;
+
     // --- Write source matrix ---
     $display("  Writing source matrix ...");
     for (int r = 0; r < rows; r++) begin
       for (int c = 0; c < cols; c++) begin
-        val = r * cols + c + 1;
+        val = (r * cols + c) % 255 + 1;
         write_sram(sram_addr(src_mem, c, r), replicate8(val));
       end
     end
@@ -181,14 +190,14 @@ import tb_type_defines_pkg::*;
     write_sram(32'h33600010, cfg);
     ocl_rd32(ADDR_TOP_INTERRUPT, cyc_before);
     write_sram(32'h33000030, 128'h0);
-    #5000ns;
+    repeat (wait_ns) #1ns;
     ocl_rd32(ADDR_TOP_INTERRUPT, cyc_after);
     naive_cycles = cyc_after - cyc_before;
 
     $display("  Verifying naive result (mem=%0d) ...", dst_naive);
     for (int r = 0; r < rows; r++) begin
       for (int c = 0; c < cols; c++) begin
-        val = r * cols + c + 1;
+        val = (r * cols + c) % 255 + 1;
         verify_sram(sram_addr(dst_naive, r, c), replicate8(val));
       end
     end
@@ -200,14 +209,14 @@ import tb_type_defines_pkg::*;
     write_sram(32'h33600010, cfg);
     ocl_rd32(ADDR_TOP_INTERRUPT, cyc_before);
     write_sram(32'h33000030, 128'h0);
-    #5000ns;
+    repeat (wait_ns) #1ns;
     ocl_rd32(ADDR_TOP_INTERRUPT, cyc_after);
     opt_cycles = cyc_after - cyc_before;
 
     $display("  Verifying optimized result (mem=%0d) ...", dst_opt);
     for (int r = 0; r < rows; r++) begin
       for (int c = 0; c < cols; c++) begin
-        val = r * cols + c + 1;
+        val = (r * cols + c) % 255 + 1;
         verify_sram(sram_addr(dst_opt, r, c), replicate8(val));
       end
     end
@@ -231,15 +240,18 @@ import tb_type_defines_pkg::*;
     #500ns;
 
     // GBControl configuration (required before any GB operations)
+    // base_large = {0, 256, 512}, num_vector_large = 16 for all regions
+    // Each region holds up to 256 entries → supports matrices up to 16x16
     $display("\n===== GBControl config =====");
-    write_sram(32'h33400010, 128'h00000000008000030040000300000002);
+    write_sram(32'h33400010, 128'h00000000_02000010_01000010_00000010);
 
     // ---- Test suite: multiple matrix sizes, each with opcode 0 and 1 ----
     //   Memory layout per test: src=0, naive_dst=1, opt_dst=2
-    run_transpose_test("1x1",   1, 1,  /*src*/0, /*naive*/1, /*opt*/2);
-    run_transpose_test("2x3",   2, 3,  /*src*/0, /*naive*/1, /*opt*/2);
-    run_transpose_test("3x2",   3, 2,  /*src*/0, /*naive*/1, /*opt*/2);
-    run_transpose_test("4x4",   4, 4,  /*src*/0, /*naive*/1, /*opt*/2);
+    run_transpose_test("3x2",    3,  2,  /*src*/0, /*naive*/1, /*opt*/2);
+    run_transpose_test("4x4",    4,  4,  /*src*/0, /*naive*/1, /*opt*/2);
+    run_transpose_test("8x4",    8,  4,  /*src*/0, /*naive*/1, /*opt*/2);
+    run_transpose_test("8x8",    8,  8,  /*src*/0, /*naive*/1, /*opt*/2);
+    run_transpose_test("16x16", 16, 16,  /*src*/0, /*naive*/1, /*opt*/2);
 
     // Read interrupt counter
     ocl_rd32(ADDR_TOP_INTERRUPT, interrupt_cycles);
