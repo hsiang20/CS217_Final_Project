@@ -112,15 +112,22 @@ class TransposeConfig {
 // Transpose Module
 //
 // Opcode 0 (naive): Read A[row][col], write A^T[col][row] element-by-element.
+//   FSM: READ → WAIT_RSP → WRITE → NEXT  (4 states per element)
 //
-// Opcode 1 (banked BRAM):
+// Opcode 1 (banked BRAM, pipelined):
 //   Uses kNumBramBanks local BRAM banks with diagonal banking:
 //     A[r][c] → bank (r+c) % kNumBramBanks, address r.
-//   This ensures all elements of any single row (or column) reside in
-//   distinct banks, enabling conflict-free parallel access.
 //
-//   Fill phase:  read entire source matrix from GBCore into local BRAMs.
-//   Drain phase: read from local BRAMs in transposed order, write to dest.
+//   Fill phase:  read from GBCore SRAM into local BRAMs.
+//     FILL_READ → FILL_STORE  (2 states per element)
+//
+//   Drain phase: read from BRAMs in transposed order, write to dest.
+//     DRAIN_FIRST (1 setup state) → DRAIN_PIPE (1 state per element)
+//     DRAIN_PIPE pushes the write for the current element while
+//     pre-reading the next element from BRAM — these are independent
+//     resources so they execute in parallel within II=3.
+//
+//   Total: ~3 states/element vs naive's 4 → ~1.33x speedup.
 //
 // Matrix layout in GBCore SRAM (via DataReq addressing):
 //   Element A[r][c]  →  (memory_index=src, timestep=r, vector=c)
@@ -150,15 +157,15 @@ class Transpose : public match::Module {
   Connections::In<spec::GB::Large::DataRsp<1>>  large_rsp;
 
   // --------------------------------------------------------
-  // FSM: naive path (READ, WAIT_RSP, WRITE, NEXT, FIN)
-  //      banked-BRAM path (FILL_READ, FILL_WAIT, FILL_NEXT,
-  //                        DRAIN_READ_BRAM, DRAIN_WRITE, DRAIN_NEXT)
+  // FSM: naive path  (READ, WAIT_RSP, WRITE, NEXT, FIN)
+  //      banked-BRAM (FILL_READ, FILL_STORE,
+  //                   DRAIN_FIRST, DRAIN_PIPE)
   // --------------------------------------------------------
   enum FSM {
     IDLE,
     READ, WAIT_RSP, WRITE, NEXT, FIN,
-    FILL_READ, FILL_WAIT, FILL_NEXT,
-    DRAIN_READ_BRAM, DRAIN_WRITE, DRAIN_NEXT
+    FILL_READ, FILL_STORE,
+    DRAIN_FIRST, DRAIN_PIPE
   };
   FSM state;
 
@@ -299,6 +306,7 @@ class Transpose : public match::Module {
       }
 
       // --- Banked-BRAM path: fill from src, then drain to dst ---
+
       case FILL_READ: {
         req.is_write       = 0;
         req.memory_index   = config.memory_index_src;
@@ -309,32 +317,42 @@ class Transpose : public match::Module {
         break;
       }
 
-      case FILL_WAIT: {
+      case FILL_STORE: {
         spec::GB::Large::DataRsp<1> rsp = large_rsp.Pop();
         NVUINT16 addr = BramAddr(config.row_counter, config.col_counter);
         bram_flat[addr] = PackWord(rsp.read_vector[0]);
         break;
       }
 
-      case FILL_NEXT: break;
-
-      case DRAIN_READ_BRAM: {
+      case DRAIN_FIRST: {
         NVUINT16 addr = BramAddr(config.row_counter, config.col_counter);
         read_data = UnpackWord(bram_flat[addr]);
         break;
       }
 
-      case DRAIN_WRITE: {
+      case DRAIN_PIPE: {
+        // Push SRAM write using data pre-read in previous iteration
         req.is_write       = 1;
         req.memory_index   = config.memory_index_dst;
         req.vector_index   = config.row_counter;
         req.timestep_index = config.col_counter;
         req.write_data     = read_data;
         large_req.Push(req);
+
+        // Speculatively pre-read BRAM for the NEXT element (parallel
+        // with Push above — independent resources, no data dependency)
+        NVUINT8 next_col = config.col_counter;
+        NVUINT8 next_row = config.row_counter;
+        if (next_col < (NVUINT8)(config.num_cols - 1)) {
+          next_col++;
+        } else {
+          next_col = 0;
+          next_row++;
+        }
+        NVUINT16 next_addr = BramAddr(next_row, next_col);
+        read_data = UnpackWord(bram_flat[next_addr]);
         break;
       }
-
-      case DRAIN_NEXT: break;
 
       default: break;
     }
@@ -356,18 +374,16 @@ class Transpose : public match::Module {
       }
       case FIN: next = IDLE; break;
 
-      case FILL_READ:  next = FILL_WAIT; break;
-      case FILL_WAIT:  next = FILL_NEXT; break;
-      case FILL_NEXT: {
+      case FILL_READ: next = FILL_STORE; break;
+      case FILL_STORE: {
         bool all_read = config.Advance();
-        next = all_read ? DRAIN_READ_BRAM : FILL_READ;
+        next = all_read ? DRAIN_FIRST : FILL_READ;
         break;
       }
-      case DRAIN_READ_BRAM: next = DRAIN_WRITE; break;
-      case DRAIN_WRITE:     next = DRAIN_NEXT; break;
-      case DRAIN_NEXT: {
+      case DRAIN_FIRST: next = DRAIN_PIPE; break;
+      case DRAIN_PIPE: {
         bool all_written = config.Advance();
-        next = all_written ? FIN : DRAIN_READ_BRAM;
+        next = all_written ? FIN : DRAIN_PIPE;
         break;
       }
 
