@@ -101,14 +101,14 @@ import tb_type_defines_pkg::*;
   // Helpers
   // =========================================================================
 
-  // SRAM flat address matching GBCore's SetLargeBuffer (for timestep < 16):
-  //   flat = base_large[mem] + ts + vec * 16
+  // SRAM flat address matching GBCore's SetLargeBuffer (general formula):
+  //   flat = base_large[mem] + (ts % 16) + ((ts / 16) * num_vec + vec) * 16
   //   AXI  = 0x33500000 + flat * 0x10
-  // With base_large = {0, 256, 512}: mem stride = 0x1000
+  // With base_large = {0, 1024, 2048}, num_vec = 32
   function automatic logic [31:0] sram_addr(int mem, int vec, int ts);
-    return 32'h33500000 + mem[31:0] * 32'h1000
-                        + vec[31:0] * 32'h100
-                        + ts[31:0]  * 32'h10;
+    int flat;
+    flat = mem * 1024 + (ts % 16) + ((ts / 16) * 32 + vec) * 16;
+    return 32'h33500000 + flat[31:0] * 32'h10;
   endfunction
 
   // Replicate an 8-bit value across all 16 bytes of a 128-bit word
@@ -153,12 +153,17 @@ import tb_type_defines_pkg::*;
   //
   //   After transpose, A[r][c] appears at dst(timestep=c, vector=r)
   //
-  //   Element value = (r*cols + c) % 255 + 1  → always in [1, 255], never zero
+  //   Element value = (r*cols + c) % 255 + 1  (always in [1, 255], never zero)
+  //
+  //   overhead = fixed OCL bridge latency (from 1x1 baseline), subtracted
+  //              to get pure transpose time.
   // =========================================================================
   task automatic run_transpose_test(
       input string label,
       input int rows, cols,
-      input int src_mem, dst_naive, dst_opt);
+      input int src_mem, dst_naive, dst_opt,
+      input int overhead,
+      output logic [31:0] out_naive, out_opt);
 
     logic [127:0] cfg;
     logic [7:0]   val;
@@ -199,7 +204,6 @@ import tb_type_defines_pkg::*;
         verify_sram(sram_addr(dst_naive, r, c), replicate8(val));
       end
     end
-    $display("  Naive interrupt cycles: %0d", naive_cycles);
 
     // --- Optimized transpose (opcode 1) ---
     $display("  Running optimized transpose (opcode 1, banked BRAM) ...");
@@ -217,19 +221,28 @@ import tb_type_defines_pkg::*;
         verify_sram(sram_addr(dst_opt, r, c), replicate8(val));
       end
     end
-    $display("  Optimized interrupt cycles: %0d", opt_cycles);
 
     // --- Performance comparison ---
-    $display("  >> %s (%0dx%0d): naive=%0d cyc, optimized=%0d cyc, speedup=%.2fx",
-             label, rows, cols, naive_cycles, opt_cycles,
-             real'(naive_cycles) / real'(opt_cycles));
+    out_naive = naive_cycles;
+    out_opt   = opt_cycles;
+    begin
+      int adj_naive, adj_opt;
+      adj_naive = ($signed(naive_cycles) > overhead) ? ($signed(naive_cycles) - overhead) : 1;
+      adj_opt   = ($signed(opt_cycles)   > overhead) ? ($signed(opt_cycles)   - overhead) : 1;
+      $display("  >> %s (%0dx%0d):", label, rows, cols);
+      $display("     Raw:      naive=%0d cyc, optimized=%0d cyc, speedup=%.2fx",
+               naive_cycles, opt_cycles, real'(naive_cycles) / real'(opt_cycles));
+      $display("     Adjusted: naive=%0d cyc, optimized=%0d cyc, speedup=%.2fx",
+               adj_naive, adj_opt, real'(adj_naive) / real'(adj_opt));
+    end
   endtask
 
   // =========================================================================
   // Main Test Sequence
   // =========================================================================
   initial begin
-    logic [31:0] interrupt_cycles;
+    logic [31:0] naive_out, opt_out;
+    int perf_overhead;
 
     tb.power_up(.clk_recipe_a(ClockRecipe::A0),
                 .clk_recipe_b(ClockRecipe::B0),
@@ -237,22 +250,26 @@ import tb_type_defines_pkg::*;
     #500ns;
 
     // GBControl configuration (required before any GB operations)
-    // base_large = {0, 256, 512}, num_vector_large = 16 for all regions
-    // Each region holds up to 256 entries → supports matrices up to 16x16
+    // base_large = {0, 1024, 2048}, num_vector_large = 32 for all regions
+    // Each region holds up to 1024 entries -> supports matrices up to 32x32
     $display("\n===== GBControl config =====");
-    write_sram(32'h33400010, 128'h00000000_02000010_01000010_00000010);
+    write_sram(32'h33400010, 128'h00000000_08000020_04000020_00000020);
 
-    // ---- Test suite: multiple matrix sizes, each with opcode 0 and 1 ----
-    //   Memory layout per test: src=0, naive_dst=1, opt_dst=2
-    run_transpose_test("3x2",    3,  2,  /*src*/0, /*naive*/1, /*opt*/2);
-    run_transpose_test("4x4",    4,  4,  /*src*/0, /*naive*/1, /*opt*/2);
-    run_transpose_test("8x4",    8,  4,  /*src*/0, /*naive*/1, /*opt*/2);
-    run_transpose_test("8x8",    8,  8,  /*src*/0, /*naive*/1, /*opt*/2);
-    run_transpose_test("16x16", 16, 16,  /*src*/0, /*naive*/1, /*opt*/2);
+    // ---- Overhead calibration: 1x1 matrix ----
+    run_transpose_test("1x1", 1, 1, 0, 1, 2, 0, naive_out, opt_out);
+    perf_overhead = (naive_out + opt_out) / 2;
+    $display("\n  ** Perf overhead estimate (from 1x1 avg): %0d cycles **\n", perf_overhead);
 
-    // Read perf counter (holds last test's latency)
-    ocl_rd32(ADDR_TOP_INTERRUPT, interrupt_cycles);
-    $display("\nLast perf counter value: %0d cycles", interrupt_cycles);
+    // ---- Test suite: square and rectangular matrices ----
+    run_transpose_test("3x2",    3,  2,  0, 1, 2, perf_overhead, naive_out, opt_out);
+    run_transpose_test("4x4",    4,  4,  0, 1, 2, perf_overhead, naive_out, opt_out);
+    run_transpose_test("4x8",    4,  8,  0, 1, 2, perf_overhead, naive_out, opt_out);
+    run_transpose_test("8x4",    8,  4,  0, 1, 2, perf_overhead, naive_out, opt_out);
+    run_transpose_test("8x8",    8,  8,  0, 1, 2, perf_overhead, naive_out, opt_out);
+    run_transpose_test("16x8",  16,  8,  0, 1, 2, perf_overhead, naive_out, opt_out);
+    run_transpose_test("8x16",   8, 16,  0, 1, 2, perf_overhead, naive_out, opt_out);
+    run_transpose_test("16x16", 16, 16,  0, 1, 2, perf_overhead, naive_out, opt_out);
+    run_transpose_test("32x32", 32, 32,  0, 1, 2, perf_overhead, naive_out, opt_out);
 
     #500ns;
     tb.power_down();

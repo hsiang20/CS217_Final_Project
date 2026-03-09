@@ -16,11 +16,12 @@
 // Transpose Test Application for design_top on AWS F2 FPGA
 // ============================================================================
 // Exercises both transpose opcodes (naive / banked-BRAM) at multiple matrix
-// sizes: 3x2, 4x4, 8x4, 8x8, 16x16.
+// sizes including square and rectangular up to 32x32.
 //
-// SRAM flat address = base_large[mem] + ts + vec * 16  (for ts < 16)
-// AXI  address      = 0x33500000 + flat * 0x10
-// With base_large = {0, 256, 512}: mem stride = 0x1000
+// SRAM flat address (GBCore SetLargeBuffer):
+//   flat = base_large[mem] + (ts % 16) + ((ts / 16) * num_vec + vec) * 16
+//   AXI  = 0x33500000 + flat * 0x10
+// With base_large = {0, 1024, 2048}, num_vec = 32
 //
 // Matrix element A[r][c] is stored at (timestep=r, vector=c).
 // After transpose, A[r][c] appears at dst (timestep=c, vector=r).
@@ -128,7 +129,8 @@ int top_read(int bh, AxiReadCommand* cmd) {
 // ============================================================================
 
 static uint32_t sram_addr(int mem, int vec, int ts) {
-    return 0x33500000 + mem * 0x1000 + vec * 0x100 + ts * 0x10;
+    uint32_t flat = (uint32_t)(mem * 1024 + (ts & 0xF) + ((ts >> 4) * 32 + vec) * 16);
+    return 0x33500000 + flat * 0x10;
 }
 
 static void fill_vector(uint32_t data[4], uint8_t val) {
@@ -149,11 +151,17 @@ static void make_transpose_cfg(uint32_t data[4],
 //
 //   Source A[r][c] at (timestep=r, vector=c), value = (r*cols+c)%255+1
 //   After transpose: A[r][c] at dst (timestep=c, vector=r)
+//
+//   overhead = fixed OCL bridge latency (from 1x1 baseline), subtracted
+//              to get pure transpose time.
+//   Returns naive_cycles and opt_cycles via output pointers.
 // ============================================================================
 
 static int run_transpose_test(int bh, const char* label,
                                int rows, int cols,
-                               int src_mem, int dst_naive, int dst_opt) {
+                               int src_mem, int dst_naive, int dst_opt,
+                               int overhead,
+                               uint32_t* out_naive, uint32_t* out_opt) {
     int rc = 0;
     AxiWriteCommand wcmd;
     AxiReadCommand  rcmd;
@@ -184,12 +192,12 @@ static int run_transpose_test(int bh, const char* label,
     if (top_write(bh, &wcmd)) rc = 1;
     usleep(10);
 
-    ocl_wr32(bh, ADDR_TOP_INTERRUPT, 0);          // arm perf counter
+    ocl_wr32(bh, ADDR_TOP_INTERRUPT, 0);              // arm perf counter
     wcmd.addr = 0x33000030;
     memset(wcmd.data, 0, sizeof(wcmd.data));
     if (top_write(bh, &wcmd)) rc = 1;
     usleep(1000 + rows * cols * 10);
-    ocl_rd32(bh, ADDR_TOP_INTERRUPT, &naive_cycles); // read latency
+    ocl_rd32(bh, ADDR_TOP_INTERRUPT, &naive_cycles);   // read latency
 
     printf("  Verifying naive result (mem=%d) ...\n", dst_naive);
     for (int r = 0; r < rows; r++) {
@@ -202,7 +210,6 @@ static int run_transpose_test(int bh, const char* label,
             usleep(10);
         }
     }
-    printf("  Naive interrupt cycles: %u\n", naive_cycles);
 
     // --- Optimized transpose (opcode 1) ---
     printf("  Running optimized transpose (opcode 1, banked BRAM) ...\n");
@@ -211,12 +218,12 @@ static int run_transpose_test(int bh, const char* label,
     if (top_write(bh, &wcmd)) rc = 1;
     usleep(10);
 
-    ocl_wr32(bh, ADDR_TOP_INTERRUPT, 0);          // arm perf counter
+    ocl_wr32(bh, ADDR_TOP_INTERRUPT, 0);              // arm perf counter
     wcmd.addr = 0x33000030;
     memset(wcmd.data, 0, sizeof(wcmd.data));
     if (top_write(bh, &wcmd)) rc = 1;
     usleep(1000 + rows * cols * 10);
-    ocl_rd32(bh, ADDR_TOP_INTERRUPT, &opt_cycles); // read latency
+    ocl_rd32(bh, ADDR_TOP_INTERRUPT, &opt_cycles);     // read latency
 
     printf("  Verifying optimized result (mem=%d) ...\n", dst_opt);
     for (int r = 0; r < rows; r++) {
@@ -229,11 +236,19 @@ static int run_transpose_test(int bh, const char* label,
             usleep(10);
         }
     }
-    printf("  Optimized interrupt cycles: %u\n", opt_cycles);
 
-    printf("  >> %s (%dx%d): naive=%u cyc, optimized=%u cyc, speedup=%.2fx\n",
-           label, rows, cols, naive_cycles, opt_cycles,
+    // --- Performance comparison ---
+    *out_naive = naive_cycles;
+    *out_opt   = opt_cycles;
+    int adj_naive = ((int)naive_cycles > overhead) ? ((int)naive_cycles - overhead) : 1;
+    int adj_opt   = ((int)opt_cycles   > overhead) ? ((int)opt_cycles   - overhead) : 1;
+    printf("  >> %s (%dx%d):\n", label, rows, cols);
+    printf("     Raw:      naive=%u cyc, optimized=%u cyc, speedup=%.2fx\n",
+           naive_cycles, opt_cycles,
            opt_cycles > 0 ? (double)naive_cycles / opt_cycles : 0.0);
+    printf("     Adjusted: naive=%d cyc, optimized=%d cyc, speedup=%.2fx\n",
+           adj_naive, adj_opt,
+           adj_opt > 0 ? (double)adj_naive / adj_opt : 0.0);
 
     return rc;
 }
@@ -251,6 +266,8 @@ int main(int argc, char** argv) {
     int slot_id    = atoi(argv[1]);
     int bar_handle = -1;
     int rc         = 0;
+    uint32_t naive_out, opt_out;
+    int perf_overhead;
 
     if (fpga_mgmt_init() != 0) {
         fprintf(stderr, "Failed to initialize fpga_mgmt\n");
@@ -263,23 +280,27 @@ int main(int argc, char** argv) {
     printf("---- System Initialization (bar_handle: %d) ----\n", bar_handle);
 
     // GBControl configuration (required before any GB operations)
-    // base_large = {0, 256, 512}, num_vector_large = 16 for all regions
+    // base_large = {0, 1024, 2048}, num_vector_large = 32 for all regions
     printf("\n===== GBControl config =====\n");
-    AxiWriteCommand gb_cfg = {0x33400010, {0x00000010, 0x01000010, 0x02000010, 0x00000000}};
+    AxiWriteCommand gb_cfg = {0x33400010, {0x00000020, 0x04000020, 0x08000020, 0x00000000}};
     if (top_write(bar_handle, &gb_cfg)) rc = 1;
     usleep(10);
 
-    // ---- Test suite: multiple matrix sizes ----
-    if (run_transpose_test(bar_handle, "3x2",   3,  2, 0, 1, 2)) rc = 1;
-    if (run_transpose_test(bar_handle, "4x4",   4,  4, 0, 1, 2)) rc = 1;
-    if (run_transpose_test(bar_handle, "8x4",   8,  4, 0, 1, 2)) rc = 1;
-    if (run_transpose_test(bar_handle, "8x8",   8,  8, 0, 1, 2)) rc = 1;
-    if (run_transpose_test(bar_handle, "16x16", 16, 16, 0, 1, 2)) rc = 1;
+    // ---- Overhead calibration: 1x1 matrix ----
+    if (run_transpose_test(bar_handle, "1x1", 1, 1, 0, 1, 2, 0, &naive_out, &opt_out)) rc = 1;
+    perf_overhead = (int)(naive_out + opt_out) / 2;
+    printf("\n  ** Perf overhead estimate (from 1x1 avg): %d cycles **\n", perf_overhead);
 
-    // Read perf counter (holds last test's latency)
-    uint32_t last_perf = 0;
-    ocl_rd32(bar_handle, ADDR_TOP_INTERRUPT, &last_perf);
-    printf("\nLast perf counter value: %u cycles\n", last_perf);
+    // ---- Test suite: square and rectangular matrices ----
+    if (run_transpose_test(bar_handle, "3x2",    3,  2, 0, 1, 2, perf_overhead, &naive_out, &opt_out)) rc = 1;
+    if (run_transpose_test(bar_handle, "4x4",    4,  4, 0, 1, 2, perf_overhead, &naive_out, &opt_out)) rc = 1;
+    if (run_transpose_test(bar_handle, "4x8",    4,  8, 0, 1, 2, perf_overhead, &naive_out, &opt_out)) rc = 1;
+    if (run_transpose_test(bar_handle, "8x4",    8,  4, 0, 1, 2, perf_overhead, &naive_out, &opt_out)) rc = 1;
+    if (run_transpose_test(bar_handle, "8x8",    8,  8, 0, 1, 2, perf_overhead, &naive_out, &opt_out)) rc = 1;
+    if (run_transpose_test(bar_handle, "16x8",  16,  8, 0, 1, 2, perf_overhead, &naive_out, &opt_out)) rc = 1;
+    if (run_transpose_test(bar_handle, "8x16",   8, 16, 0, 1, 2, perf_overhead, &naive_out, &opt_out)) rc = 1;
+    if (run_transpose_test(bar_handle, "16x16", 16, 16, 0, 1, 2, perf_overhead, &naive_out, &opt_out)) rc = 1;
+    if (run_transpose_test(bar_handle, "32x32", 32, 32, 0, 1, 2, perf_overhead, &naive_out, &opt_out)) rc = 1;
 
     printf("\n---- TEST %s ----\n", (rc == 0) ? "PASSED" : "FAILED");
 
