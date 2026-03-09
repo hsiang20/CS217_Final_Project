@@ -104,15 +104,31 @@ module design_top
       $display("if_axi_wr_b_vld = %b, if_axi_wr_b_rdy = %b, if_axi_wr_b_dat = %h", if_axi_wr_b_vld, if_axi_wr_b_rdy, if_axi_wr_b_dat);
   end*/
 
-  // Interrupt cycles counter
+  // Performance counter: measures clock cycles from arm to interrupt rising edge.
+  // Arm by writing any value to ADDR_TOP_INTERRUPT via OCL.
+  // Read the latency result from ADDR_TOP_INTERRUPT via OCL.
+  logic        perf_start_pulse;
+  logic        perf_running;
+  logic [31:0] perf_counter;
+  logic        interrupt_prev;
 
-  logic [31:0] interrupt_cycles;
-  counter #(.WIDTH(32)) u_interrupt_cycles_counter (
-            .clk (clk_main_a0),
-            .rst_n (rst_main_n),
-            .en (interrupt),
-            .q (interrupt_cycles)
-          );
+  always_ff @(posedge clk_main_a0 or negedge rst_main_n) begin
+    if (!rst_main_n) begin
+      perf_running   <= 1'b0;
+      perf_counter   <= 32'd0;
+      interrupt_prev <= 1'b0;
+    end else begin
+      interrupt_prev <= interrupt;
+      if (perf_start_pulse) begin
+        perf_counter <= 32'd0;
+        perf_running <= 1'b1;
+      end else if (interrupt && !interrupt_prev) begin
+        perf_running <= 1'b0;
+      end else if (perf_running) begin
+        perf_counter <= perf_counter + 32'd1;
+      end
+    end
+  end
 
 
   //=============================================================================
@@ -243,8 +259,11 @@ module design_top
 
       if_axi_wr_b_rdy <= 1'b1;
       axi_ready <= 1'b1;
+      perf_start_pulse <= 1'b0;
 
     end else begin
+      perf_start_pulse <= 1'b0;  // default: one-cycle pulse
+
       // Capture address/data
       if (axil_awvalid_m && axil_awready_m) begin
         wr_aw_captured <= 1'b1;
@@ -257,7 +276,11 @@ module design_top
 
       // Fire a write when both parts captured and no BRESP pending
       if (wr_aw_captured && wr_w_captured && !axil_bvalid_m) begin
-        
+
+        // Perf counter: arm on write to ADDR_TOP_INTERRUPT
+        if (wr_addr_q == ADDR_TOP_INTERRUPT)
+          perf_start_pulse <= 1'b1;
+
         // AXI Write Address Channel
         // TODO 2:
         //    1. Loop through the AXI Write address registers.
@@ -403,7 +426,7 @@ module design_top
         end
         else begin
           if (axil_araddr_m == ADDR_TOP_INTERRUPT) begin
-            axil_rdata_m <= interrupt_cycles;
+            axil_rdata_m <= perf_counter;
           end else begin
             axil_rdata_m <= 32'hDEADBEEF;
           end

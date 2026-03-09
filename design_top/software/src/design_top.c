@@ -158,7 +158,7 @@ static int run_transpose_test(int bh, const char* label,
     AxiWriteCommand wcmd;
     AxiReadCommand  rcmd;
     uint8_t val;
-    uint32_t cyc_before, cyc_after, naive_cycles, opt_cycles;
+    uint32_t naive_cycles, opt_cycles;
 
     printf("\n=========================================================\n");
     printf(" Test: %s  (%dx%d)  src=%d  naive_dst=%d  opt_dst=%d\n",
@@ -184,13 +184,12 @@ static int run_transpose_test(int bh, const char* label,
     if (top_write(bh, &wcmd)) rc = 1;
     usleep(10);
 
-    ocl_rd32(bh, ADDR_TOP_INTERRUPT, &cyc_before);
+    ocl_wr32(bh, ADDR_TOP_INTERRUPT, 0);          // arm perf counter
     wcmd.addr = 0x33000030;
     memset(wcmd.data, 0, sizeof(wcmd.data));
     if (top_write(bh, &wcmd)) rc = 1;
     usleep(1000 + rows * cols * 10);
-    ocl_rd32(bh, ADDR_TOP_INTERRUPT, &cyc_after);
-    naive_cycles = cyc_after - cyc_before;
+    ocl_rd32(bh, ADDR_TOP_INTERRUPT, &naive_cycles); // read latency
 
     printf("  Verifying naive result (mem=%d) ...\n", dst_naive);
     for (int r = 0; r < rows; r++) {
@@ -212,13 +211,12 @@ static int run_transpose_test(int bh, const char* label,
     if (top_write(bh, &wcmd)) rc = 1;
     usleep(10);
 
-    ocl_rd32(bh, ADDR_TOP_INTERRUPT, &cyc_before);
+    ocl_wr32(bh, ADDR_TOP_INTERRUPT, 0);          // arm perf counter
     wcmd.addr = 0x33000030;
     memset(wcmd.data, 0, sizeof(wcmd.data));
     if (top_write(bh, &wcmd)) rc = 1;
     usleep(1000 + rows * cols * 10);
-    ocl_rd32(bh, ADDR_TOP_INTERRUPT, &cyc_after);
-    opt_cycles = cyc_after - cyc_before;
+    ocl_rd32(bh, ADDR_TOP_INTERRUPT, &opt_cycles); // read latency
 
     printf("  Verifying optimized result (mem=%d) ...\n", dst_opt);
     for (int r = 0; r < rows; r++) {
@@ -278,10 +276,10 @@ int main(int argc, char** argv) {
     if (run_transpose_test(bar_handle, "8x8",   8,  8, 0, 1, 2)) rc = 1;
     if (run_transpose_test(bar_handle, "16x16", 16, 16, 0, 1, 2)) rc = 1;
 
-    // Read interrupt counter
-    uint32_t interrupt_cycles = 0;
-    ocl_rd32(bar_handle, ADDR_TOP_INTERRUPT, &interrupt_cycles);
-    printf("\nTotal interrupt cycles across all tests: %u\n", interrupt_cycles);
+    // Read perf counter (holds last test's latency)
+    uint32_t last_perf = 0;
+    ocl_rd32(bar_handle, ADDR_TOP_INTERRUPT, &last_perf);
+    printf("\nLast perf counter value: %u cycles\n", last_perf);
 
     printf("\n---- TEST %s ----\n", (rc == 0) ? "PASSED" : "FAILED");
 

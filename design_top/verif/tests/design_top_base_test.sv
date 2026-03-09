@@ -162,7 +162,6 @@ import tb_type_defines_pkg::*;
 
     logic [127:0] cfg;
     logic [7:0]   val;
-    logic [31:0]  cyc_before, cyc_after;
     logic [31:0]  naive_cycles, opt_cycles;
     int           wait_ns;
 
@@ -188,11 +187,10 @@ import tb_type_defines_pkg::*;
     $display("  Running naive transpose (opcode 0) ...");
     cfg = transpose_cfg(src_mem, dst_naive, rows, cols, 0);
     write_sram(32'h33600010, cfg);
-    ocl_rd32(ADDR_TOP_INTERRUPT, cyc_before);
-    write_sram(32'h33000030, 128'h0);
+    ocl_wr32(ADDR_TOP_INTERRUPT, 32'h0);       // arm perf counter
+    write_sram(32'h33000030, 128'h0);           // start transpose
     repeat (wait_ns) #1ns;
-    ocl_rd32(ADDR_TOP_INTERRUPT, cyc_after);
-    naive_cycles = cyc_after - cyc_before;
+    ocl_rd32(ADDR_TOP_INTERRUPT, naive_cycles); // read latency
 
     $display("  Verifying naive result (mem=%0d) ...", dst_naive);
     for (int r = 0; r < rows; r++) begin
@@ -207,11 +205,10 @@ import tb_type_defines_pkg::*;
     $display("  Running optimized transpose (opcode 1, banked BRAM) ...");
     cfg = transpose_cfg(src_mem, dst_opt, rows, cols, 1);
     write_sram(32'h33600010, cfg);
-    ocl_rd32(ADDR_TOP_INTERRUPT, cyc_before);
-    write_sram(32'h33000030, 128'h0);
+    ocl_wr32(ADDR_TOP_INTERRUPT, 32'h0);       // arm perf counter
+    write_sram(32'h33000030, 128'h0);           // start transpose
     repeat (wait_ns) #1ns;
-    ocl_rd32(ADDR_TOP_INTERRUPT, cyc_after);
-    opt_cycles = cyc_after - cyc_before;
+    ocl_rd32(ADDR_TOP_INTERRUPT, opt_cycles);   // read latency
 
     $display("  Verifying optimized result (mem=%0d) ...", dst_opt);
     for (int r = 0; r < rows; r++) begin
@@ -253,9 +250,9 @@ import tb_type_defines_pkg::*;
     run_transpose_test("8x8",    8,  8,  /*src*/0, /*naive*/1, /*opt*/2);
     run_transpose_test("16x16", 16, 16,  /*src*/0, /*naive*/1, /*opt*/2);
 
-    // Read interrupt counter
+    // Read perf counter (holds last test's latency)
     ocl_rd32(ADDR_TOP_INTERRUPT, interrupt_cycles);
-    $display("\nTotal interrupt cycles across all tests: %0d", interrupt_cycles);
+    $display("\nLast perf counter value: %0d cycles", interrupt_cycles);
 
     #500ns;
     tb.power_down();
