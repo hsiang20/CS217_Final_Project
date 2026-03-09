@@ -914,14 +914,14 @@ Starting static elaboration
 Pass Through NonSizing Optimizer
 WARNING: [VRFC 10-9543] actual bit length 2 differs from formal bit length 1 for port 'ddr4_ck_t' [/home/ubuntu/aws-fpga/hdk/common/verif/models/fpga/fpga_ddr.svh:117]
 WARNING: [VRFC 10-9543] actual bit length 2 differs from formal bit length 1 for port 'ddr4_ck_c' [/home/ubuntu/aws-fpga/hdk/common/verif/models/fpga/fpga_ddr.svh:118]
-WARNING: [VRFC 10-9543] actual bit length 16 differs from formal bit length 32 for port 'm_axi_awaddr' [/home/ubuntu/CS217_Final_Project/design_top/design/design_top.sv:185]
-WARNING: [VRFC 10-9543] actual bit length 16 differs from formal bit length 32 for port 'm_axi_araddr' [/home/ubuntu/CS217_Final_Project/design_top/design/design_top.sv:197]
+WARNING: [VRFC 10-9543] actual bit length 16 differs from formal bit length 32 for port 'm_axi_awaddr' [/home/ubuntu/CS217_Final_Project/design_top/design/design_top.sv:201]
+WARNING: [VRFC 10-9543] actual bit length 16 differs from formal bit length 32 for port 'm_axi_araddr' [/home/ubuntu/CS217_Final_Project/design_top/design/design_top.sv:213]
 WARNING: [VRFC 10-9543] actual bit length 32 differs from formal bit length 3 for port 's_axi_awsize' [/home/ubuntu/aws-fpga/hdk/common/ip/cl_ip/cl_ip.gen/sources_1/ip/axi_register_slice_light/sim/axi_register_slice_light.v:227]
 WARNING: [VRFC 10-9543] actual bit length 32 differs from formal bit length 3 for port 's_axi_arsize' [/home/ubuntu/aws-fpga/hdk/common/ip/cl_ip/cl_ip.gen/sources_1/ip/axi_register_slice_light/sim/axi_register_slice_light.v:252]
 WARNING: [VRFC 10-8967] first argument of $fatal is invalid; expected 0, 1 or 2 [/home/ubuntu/aws-fpga/hdk/common/verif/models/sh_bfm/sh_bfm.sv:1888]
 WARNING: [VRFC 10-8967] first argument of $fatal is invalid; expected 0, 1 or 2 [/home/ubuntu/aws-fpga/hdk/common/verif/models/sh_bfm/sh_bfm.sv:2046]
-WARNING: [VRFC 10-5021] port 's_axi_arprot' is not connected on this instance [/home/ubuntu/CS217_Final_Project/design_top/design/design_top.sv:160]
-WARNING: [VRFC 10-3823] variable 'axil_awprot_m' might have multiple concurrent drivers [/home/ubuntu/CS217_Final_Project/design_top/design/design_top.sv:218]
+WARNING: [VRFC 10-5021] port 's_axi_arprot' is not connected on this instance [/home/ubuntu/CS217_Final_Project/design_top/design/design_top.sv:176]
+WARNING: [VRFC 10-3823] variable 'axil_awprot_m' might have multiple concurrent drivers [/home/ubuntu/CS217_Final_Project/design_top/design/design_top.sv:234]
 WARNING: [VRFC 10-3705] select index 7 into 'dq_temp' is out of bounds [/home/ubuntu/aws-fpga/hdk/common/verif/models/ddr4_model/ddr4_model.sv:1615]
 WARNING: [VRFC 10-3705] select index 7 into 'dq_temp' is out of bounds [/home/ubuntu/aws-fpga/hdk/common/verif/models/ddr4_model/ddr4_model.sv:1617]
 Completed static elaboration
@@ -1823,7 +1823,6 @@ Compiling module xil_defaultlib.Top_PEPartition_AxiSubordinateTo...
 Compiling module xil_defaultlib.Top_PEPartition_AxiSubordinateTo...
 Compiling module xil_defaultlib.Top_PEPartition
 Compiling module xil_defaultlib.Top
-Compiling module xil_defaultlib.counter
 Compiling module axi_infrastructure_v1_1_0.axi_infrastructure_v1_1_0_axi2ve...
 Compiling module axi_infrastructure_v1_1_0.axi_infrastructure_v1_1_0_vector...
 Compiling module axi_register_slice_v2_1_31.axi_register_slice_v2_1_31_axic_...
@@ -1849,7 +1848,7 @@ cd /home/ubuntu/CS217_Final_Project/design_top/verif/sim/xsim/design_top_base_te
   **** SW Build 5076996 on Wed May 22 18:36:09 MDT 2024
   **** IP Build 5075265 on Wed May 22 21:45:21 MDT 2024
   **** SharedData Build 5076995 on Wed May 22 18:29:18 MDT 2024
-  **** Start of session at: Mon Mar  9 01:33:08 2026
+  **** Start of session at: Mon Mar  9 02:28:57 2026
     ** Copyright 1986-2022 Xilinx, Inc. All Rights Reserved.
     ** Copyright 2022-2024 Advanced Micro Devices, Inc. All Rights Reserved.
 source xsim.dir/tb/xsim_script.tcl
@@ -2315,7 +2314,7 @@ tb.card.u_ddr4_rdimm.rcd_enabled.NOT_LRDIMM.u_ddr4_dimm.rank_instances[1].mc_ca_
   PASS addr=0x33501110
   PASS addr=0x33501200
   PASS addr=0x33501210
-  Naive interrupt cycles: 10
+  Naive interrupt cycles: 184
   Running optimized transpose (opcode 1, banked BRAM) ...
   Verifying optimized result (mem=2) ...
   PASS addr=0x33502000
@@ -2324,8 +2323,8 @@ tb.card.u_ddr4_rdimm.rcd_enabled.NOT_LRDIMM.u_ddr4_dimm.rank_instances[1].mc_ca_
   PASS addr=0x33502110
   PASS addr=0x33502200
   PASS addr=0x33502210
-  Optimized interrupt cycles: 10
-  >> 3x2 (3x2): naive=10 cyc, optimized=10 cyc, speedup=1.00x
+  Optimized interrupt cycles: 169
+  >> 3x2 (3x2): naive=184 cyc, optimized=169 cyc, speedup=1.09x
 =========================================================
  Test: 4x4  (4 x 4)  src=0  naive_dst=1  opt_dst=2
 =========================================================
@@ -2348,7 +2347,7 @@ tb.card.u_ddr4_rdimm.rcd_enabled.NOT_LRDIMM.u_ddr4_dimm.rank_instances[1].mc_ca_
   PASS addr=0x33501310
   PASS addr=0x33501320
   PASS addr=0x33501330
-  Naive interrupt cycles: 10
+  Naive interrupt cycles: 324
   Running optimized transpose (opcode 1, banked BRAM) ...
   Verifying optimized result (mem=2) ...
   PASS addr=0x33502000
@@ -2367,8 +2366,8 @@ tb.card.u_ddr4_rdimm.rcd_enabled.NOT_LRDIMM.u_ddr4_dimm.rank_instances[1].mc_ca_
   PASS addr=0x33502310
   PASS addr=0x33502320
   PASS addr=0x33502330
-  Optimized interrupt cycles: 10
-  >> 4x4 (4x4): naive=10 cyc, optimized=10 cyc, speedup=1.00x
+  Optimized interrupt cycles: 277
+  >> 4x4 (4x4): naive=324 cyc, optimized=277 cyc, speedup=1.17x
 =========================================================
  Test: 8x4  (8 x 4)  src=0  naive_dst=1  opt_dst=2
 =========================================================
@@ -2407,7 +2406,7 @@ tb.card.u_ddr4_rdimm.rcd_enabled.NOT_LRDIMM.u_ddr4_dimm.rank_instances[1].mc_ca_
   PASS addr=0x33501710
   PASS addr=0x33501720
   PASS addr=0x33501730
-  Naive interrupt cycles: 10
+  Naive interrupt cycles: 548
   Running optimized transpose (opcode 1, banked BRAM) ...
   Verifying optimized result (mem=2) ...
   PASS addr=0x33502000
@@ -2442,8 +2441,8 @@ tb.card.u_ddr4_rdimm.rcd_enabled.NOT_LRDIMM.u_ddr4_dimm.rank_instances[1].mc_ca_
   PASS addr=0x33502710
   PASS addr=0x33502720
   PASS addr=0x33502730
-  Optimized interrupt cycles: 10
-  >> 8x4 (8x4): naive=10 cyc, optimized=10 cyc, speedup=1.00x
+  Optimized interrupt cycles: 453
+  >> 8x4 (8x4): naive=548 cyc, optimized=453 cyc, speedup=1.21x
 =========================================================
  Test: 8x8  (8 x 8)  src=0  naive_dst=1  opt_dst=2
 =========================================================
@@ -2514,7 +2513,7 @@ tb.card.u_ddr4_rdimm.rcd_enabled.NOT_LRDIMM.u_ddr4_dimm.rank_instances[1].mc_ca_
   PASS addr=0x33501750
   PASS addr=0x33501760
   PASS addr=0x33501770
-  Naive interrupt cycles: 10
+  Naive interrupt cycles: 995
   Running optimized transpose (opcode 1, banked BRAM) ...
   Verifying optimized result (mem=2) ...
   PASS addr=0x33502000
@@ -2581,8 +2580,8 @@ tb.card.u_ddr4_rdimm.rcd_enabled.NOT_LRDIMM.u_ddr4_dimm.rank_instances[1].mc_ca_
   PASS addr=0x33502750
   PASS addr=0x33502760
   PASS addr=0x33502770
-  Optimized interrupt cycles: 10
-  >> 8x8 (8x8): naive=10 cyc, optimized=10 cyc, speedup=1.00x
+  Optimized interrupt cycles: 807
+  >> 8x8 (8x8): naive=995 cyc, optimized=807 cyc, speedup=1.23x
 =========================================================
  Test: 16x16  (16 x 16)  src=0  naive_dst=1  opt_dst=2
 =========================================================
@@ -2845,7 +2844,7 @@ tb.card.u_ddr4_rdimm.rcd_enabled.NOT_LRDIMM.u_ddr4_dimm.rank_instances[1].mc_ca_
   PASS addr=0x33501fd0
   PASS addr=0x33501fe0
   PASS addr=0x33501ff0
-  Naive interrupt cycles: 10
+  Naive interrupt cycles: 3682
   Running optimized transpose (opcode 1, banked BRAM) ...
   Verifying optimized result (mem=2) ...
   PASS addr=0x33502000
@@ -3104,13 +3103,13 @@ tb.card.u_ddr4_rdimm.rcd_enabled.NOT_LRDIMM.u_ddr4_dimm.rank_instances[1].mc_ca_
   PASS addr=0x33502fd0
   PASS addr=0x33502fe0
   PASS addr=0x33502ff0
-  Optimized interrupt cycles: 10
-  >> 16x16 (16x16): naive=10 cyc, optimized=10 cyc, speedup=1.00x
-Total interrupt cycles across all tests: 100
+  Optimized interrupt cycles: 2918
+  >> 16x16 (16x16): naive=3682 cyc, optimized=2918 cyc, speedup=1.26x
+Last perf counter value: 2918 cycles
 ---- ALL TESTS PASSED ----
-$finish called at time : 875970 ns : File "/home/ubuntu/CS217_Final_Project/design_top/verif/tests/design_top_base_test.sv" Line 268
-run: Time (s): cpu = 00:00:00.15 ; elapsed = 00:01:15 . Memory (MB): peak = 1441.961 ; gain = 0.000 ; free physical = 251828 ; free virtual = 265077
+$finish called at time : 876370 ns : File "/home/ubuntu/CS217_Final_Project/design_top/verif/tests/design_top_base_test.sv" Line 265
+run: Time (s): cpu = 00:00:00.12 ; elapsed = 00:01:15 . Memory (MB): peak = 1385.965 ; gain = 8.004 ; free physical = 251843 ; free virtual = 265093
 ## quit
-INFO: xsimkernel Simulation Memory Usage: 200016 KB (Peak: 234320 KB), Simulation CPU Usage: 74830 ms
-INFO: [Common 17-206] Exiting xsim at Mon Mar  9 01:34:25 2026...
+INFO: xsimkernel Simulation Memory Usage: 200008 KB (Peak: 234312 KB), Simulation CPU Usage: 74890 ms
+INFO: [Common 17-206] Exiting xsim at Mon Mar  9 02:30:15 2026...
 make[1]: Leaving directory '/home/ubuntu/CS217_Final_Project/design_top/verif/scripts'
