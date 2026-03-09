@@ -9,7 +9,7 @@ REPORT_HOME := $(REPO_TOP)/reports
 AWS_HOME := $(REPO_TOP)/$(AWS_DESIGN_NAME)
 AWS_LOGS := $(AWS_HOME)/logs
 
-.PHONY: systemc_sim hls_sim hls_sim_debug clean submission copy_rtl hls
+.PHONY: systemc_sim systemc_matmul hls_sim hls_sim_debug clean submission copy_rtl hls
 
 # Copy the generated RTL to AWS design folder
 copy_rtl:
@@ -23,6 +23,10 @@ copy_rtl:
 # Run SystemC simulation
 systemc_sim:
 	cd $(SRC_HOME)/$(DESIGN_NAME) && make
+
+# Run SystemC matmul simulation
+systemc_matmul:
+	cd $(SRC_HOME)/$(DESIGN_NAME) && make matmul
 
 # Run HLS and copy RTL
 hls: hls_sim copy_rtl

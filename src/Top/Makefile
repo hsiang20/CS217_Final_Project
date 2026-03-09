@@ -19,15 +19,23 @@ HLS_SCRIPTS ?= $(REPO_TOP)/scripts/hls/
 
 include $(HLS_SCRIPTS)/Makefile_src
 
-.PHONY: all run
+.PHONY: all run matmul matmul_run
 
 all: clean sim_test run
 
 run:
 	./sim_test
 
-sim_test: $(wildcard *.h) $(wildcard *.cpp)
-	$(CC) -o sim_test $(CFLAGS) $(USER_FLAGS) $(wildcard *.cpp) $(BOOSTLIBS) $(LIBS) > $(LOGFILE) 2>&1
+sim_test: $(wildcard *.h) testbench.cpp
+	$(CC) -o sim_test $(CFLAGS) $(USER_FLAGS) testbench.cpp $(BOOSTLIBS) $(LIBS) > $(LOGFILE) 2>&1
 
-sim_test_debug: $(wildcard *.h) $(wildcard *.cpp)
-	$(CC) -o sim_test $(CFLAGS) $(DEBUG_FLAG) $(USER_FLAGS) $(wildcard *.cpp) $(BOOSTLIBS) $(LIBS) > $(LOGFILE) 2>&1
+sim_test_debug: $(wildcard *.h) testbench.cpp
+	$(CC) -o sim_test $(CFLAGS) $(DEBUG_FLAG) $(USER_FLAGS) testbench.cpp $(BOOSTLIBS) $(LIBS) > $(LOGFILE) 2>&1
+
+matmul: clean sim_test_matmul matmul_run
+
+matmul_run:
+	./sim_test_matmul
+
+sim_test_matmul: $(wildcard *.h) testbench_matmul.cpp
+	$(CC) -o sim_test_matmul $(CFLAGS) $(USER_FLAGS) testbench_matmul.cpp $(BOOSTLIBS) $(LIBS) > $(LOGFILE) 2>&1

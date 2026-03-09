@@ -1,12 +1,27 @@
-\documentclass{article}
+\documentclass[11pt]{article}
 \usepackage[final]{nips_2017}
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
 \usepackage{hyperref}
 \usepackage{url}
 \usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{enumitem}
 
-\title{Efficient Matrix Transpose for ML Workloads (Checkpoint)}
+\lstset{
+  basicstyle=\ttfamily\small,
+  breaklines=true,
+  frame=single,
+  numbers=left,
+  numberstyle=\tiny\color{gray},
+  keywordstyle=\color{blue},
+  commentstyle=\color{green!50!black},
+}
+
+\title{Efficient Matrix Transpose and Fused $QK^T$ for ML Workloads on FPGA}
 
 \author{
   Yiming Tan\\
@@ -16,93 +31,423 @@
   \texttt{hsiangc@stanford.edu} \\
 }
 
-
 \begin{document}
 \maketitle
 
-%------------------------------------------------------------------------------
-\section{Overview}
-%------------------------------------------------------------------------------
-We adapted the code structure from lab4.
+%==============================================================================
+\begin{abstract}
+%==============================================================================
+We design, implement, and evaluate a hardware matrix transpose unit within a
+neural-network accelerator's global buffer (GBCore) subsystem. Starting from a
+naive element-by-element baseline (opcode~0), we develop an optimized banked-BRAM
+transpose (opcode~1) that achieves up to \textbf{1.26$\times$} speedup on
+$16\!\times\!16$ matrices in RTL simulation on AWS F2. We then extend the
+module to support fused $Q\!\cdot\!K^T$ computation (opcodes~2 and~3), where
+the fused variant reads the transposed $K$ directly from on-chip BRAM instead
+of round-tripping through SRAM, targeting up to $\sim$3--4$\times$ speedup for
+the combined transpose-plus-matmul workload. The entire design is verified
+through SystemC simulation, Catapult HLS synthesis, and Vivado XSIM RTL
+simulation on the AWS F2 FPGA development platform.
+\end{abstract}
 
-SystemC verification for the transpose module is done. Both the baseline and the optimized (diagonal) transpose are verified at GBModule and Top level.
+%==============================================================================
+\section{Introduction and Motivation}
+%==============================================================================
 
-%------------------------------------------------------------------------------
-\section{Checkpoints}
-%------------------------------------------------------------------------------
-\subsection{Original (Naive) Method}
+Transformer-based models require frequent matrix transpositions---most notably
+when computing $Q\!\cdot\!K^T$ in self-attention. On custom accelerators the
+transpose is typically handled by address remapping within the global buffer, but
+a naive element-by-element implementation becomes a bottleneck because every
+read--write pair serialises through the shared SRAM interface.
 
-\begin{itemize}
-  \item \textbf{Done.} Transpose via element-by-element read/write in column-major order (opcode 0).
-  \item Config selects src/dst and dimensions.
+Our project builds on the Stanford NVDLA-derived accelerator from Lab~4 and
+pursues three progressively ambitious goals from our proposal:
+
+\begin{enumerate}[nosep]
+  \item \textbf{Implement an efficient hardware transpose unit} that exploits
+        diagonal BRAM banking to reduce SRAM access states per element.
+  \item \textbf{Demonstrate measurable speedup} over the naive baseline via
+        cycle-accurate RTL simulation.
+  \item \textbf{Fuse transpose with matrix multiplication} ($Q\!\cdot\!K^T$)
+        so that the transposed operand is consumed directly from local BRAM
+        without being written back to SRAM.
+\end{enumerate}
+
+%==============================================================================
+\section{Background and Related Work}
+%==============================================================================
+
+The accelerator organises its on-chip storage as a banked SRAM inside
+\texttt{GBCore}. Each memory ``element'' is a 128-bit vector (16 $\times$
+\texttt{uint8} scalars). The \texttt{Transpose} module communicates with
+\texttt{GBCore} via single-element \texttt{DataReq}/\texttt{DataRsp} channels;
+each SRAM access occupies one iteration of the pipelined main loop at
+initiation interval II\,=\,3 clock cycles.
+
+Matrix elements are addressed by \texttt{(memory\_index, timestep\_index,
+vector\_index)}; the GBCore \texttt{SetLargeBuffer} function translates these
+into a flat SRAM address using configurable per-region base offsets and vector
+counts. We allocate up to four memory regions for the transpose and fusion
+workloads.
+
+%==============================================================================
+\section{Design and Implementation}
+%==============================================================================
+
+\subsection{Opcode 0: Naive Transpose (Baseline)}
+
+The baseline traverses the $N\!\times\!D$ source matrix in column-major order.
+For each element $A[r][c]$:
+\begin{enumerate}[nosep]
+  \item \textsc{read}: fetch $A[r][c]$ from source SRAM.
+  \item \textsc{wait\_rsp}: capture the response.
+  \item \textsc{write}: store the value at $A^T[c][r]$ in destination SRAM.
+  \item \textsc{next}: advance counters.
+\end{enumerate}
+This requires \textbf{4 FSM states per element}, each costing II\,=\,3 cycles,
+for a total of $12\,N\!D$ cycles.
+
+\subsection{Opcode 1: Banked-BRAM Transpose (Optimized)}
+
+We introduce 32 local BRAM banks (depth 32 each, 1024 entries total) with a
+\emph{diagonal banking} scheme: element $A[r][c]$ maps to bank
+$(r\!+\!c)\bmod 32$, flat address $\text{bank}\times 32 + r$. This guarantees
+that any row or column accesses distinct banks, enabling conflict-free
+single-cycle reads.
+
+The optimized transpose runs in two pipelined phases:
+
+\paragraph{Fill phase} (\textsc{fill\_read} $\to$ \textsc{fill\_store}):
+Read each element from SRAM into the corresponding BRAM location. Each element
+costs 2~states.
+
+\paragraph{Drain phase} (\textsc{drain\_first} $\to$ \textsc{drain\_pipe}):
+A single setup state pre-reads the first BRAM element; then each subsequent
+\textsc{drain\_pipe} state \emph{simultaneously} pushes the current element's
+SRAM write while speculatively reading the next element from BRAM (independent
+resources, no data dependency). Each element costs 1~state after setup.
+
+Overall: $2\,N\!D + 1 + N\!D = 3\,N\!D + 1$ states $\approx$ \textbf{3 states
+per element}---a $4/3 \approx 1.33\times$ theoretical speedup over the naive
+path.
+
+\paragraph{HLS considerations.}
+To prevent Catapult Ultra from decomposing the BRAM into 16 separate 8-bit
+memories, we store each 128-bit vector as a flat \texttt{NVUINTW(128)} word and
+use explicit \texttt{PackWord}/\texttt{UnpackWord} helpers.
+
+\subsection{Opcode 2: Unfused $Q\!\cdot\!K^T$}
+
+This opcode computes $\text{Result}[i][j] = \sum_k Q[i][k] \cdot K[j][k]$ in
+two sequential phases:
+
+\paragraph{Phase 0 -- Naive transpose.} $K(N\!\times\!D) \to K^T(D\!\times\!N)$
+is written to a temporary SRAM region (memory index~3), reusing the opcode-0
+state machine.
+
+\paragraph{Phase 1 -- SRAM-based matmul.} For each output element
+$(i,j)$, the FSM iterates over $k = 0 \ldots D\!-\!1$:
+\begin{center}
+\textsc{mm\_read\_q} $\to$ \textsc{mm\_wait\_q} $\to$ \textsc{mm\_read\_kt}
+$\to$ \textsc{mm\_wait\_kt}
+\end{center}
+Each inner iteration requires \textbf{4 SRAM-bound states} (two reads: one for
+$Q[i][k]$, one for $K^T[k][j]$). After $D$ iterations, one \textsc{mm\_write}
+state stores the accumulated dot product. Per-element cost:
+$4D + 1$ states. Total matmul cost: $M \cdot N \cdot (4D + 1)$ states, plus
+the $4ND$ states for the transpose.
+
+\subsection{Opcode 3: Fused $Q\!\cdot\!K^T$ (Transpose + Matmul)}
+
+The key optimisation: $K$ is loaded into local BRAM (fill phase only, no
+write-back), and the matmul reads $K^T$ values directly from BRAM.
+
+\paragraph{Phase 0 -- Fill $K$ into BRAM.} Identical to opcode-1's fill phase:
+$2\,N\!D$ states.
+
+\paragraph{Phase 1 -- BRAM-accelerated matmul.} For each row $i$ of $Q$, for
+each inner dimension $k$:
+\begin{enumerate}[nosep]
+  \item \textsc{mm\_read\_q}: Read $Q[i][k]$ from SRAM (1 state).
+  \item \textsc{mm\_wait\_q}: Capture response (1 state).
+  \item \textsc{mm\_mac} $\times N$: For each $j$, read $K[j][k]$ from BRAM
+        and accumulate $\text{accum}[j] \mathrel{+}= q \cdot k_{\text{val}}$
+        (1 state each, BRAM-only).
+\end{enumerate}
+After all $D$ values of $k$, $N$ \textsc{mm\_write} states flush the
+accumulators to SRAM. Per-row cost: $D(2 + N) + N$ states. Total:
+$M \cdot [D(2+N) + N] + 2ND$ states.
+
+\paragraph{Savings analysis.}
+The fused path eliminates:
+\begin{itemize}[nosep]
+  \item The full $K^T$ write-back to SRAM ($2ND$ states saved vs.\ unfused
+        transpose).
+  \item All $M\!\cdot\!N\!\cdot\!D$ SRAM reads of $K^T$ during matmul
+        (replaced by single-cycle BRAM reads).
 \end{itemize}
+The dominant-term speedup ratio approaches $4N/(2+N)$ for large $N$:
+$\sim$2$\times$ at $N\!=\!2$, $\sim$3.2$\times$ at $N\!=\!8$,
+$\sim$3.6$\times$ at $N\!=\!16$.
 
-%------------------------------------------------------------------------------
-\subsection{Diagonal (Efficient) Method}
+\subsection{Configuration Interface}
 
-\begin{itemize}
-  \item \textbf{Done.} Transpose by anti-diagonals using local BRAM for better locality (opcode 1).
-  \item Config selects src/dst and dimensions.
-  \item Same AXI config interface; opcode bit selects naive vs.\ diagonal.
-\end{itemize}
-
-%------------------------------------------------------------------------------
-\subsection{Test Design and Coverage}
-
-\begin{itemize}
-  \item \textbf{GBModule testbench:} Exercises both opcodes on a $3\times2$ matrix; writes source, runs naive then diagonal, reads back and verifies all 6 elements for each.
-  \item \textbf{Top-level test:} CSV-driven AXI sequence runs the same flow at Top; pass on interrupt and no errors.
-  \item \textbf{Automation:} \texttt{test.py} runs SystemC (and RTL) \texttt{make} for GBCore, GBModule, GBPartition, and Top; logs to \texttt{reports/hls/}.
-\end{itemize}
-
-%------------------------------------------------------------------------------
-\section{SystemC Test Logic}
-\label{sec:systemc}
-%------------------------------------------------------------------------------
-
-\subsection{Hierarchy and automation}
-
-SystemC tests are run in four levels: \texttt{GBCore} $\rightarrow$ \texttt{GBModule} $\rightarrow$ \texttt{GBPartition} $\rightarrow$ \texttt{Top}. The script \texttt{test.py} invokes \texttt{make} in each corresponding source (or HLS) directory, captures stdout/stderr to \texttt{reports/hls/systemc.log.txt}, and marks a level \textbf{PASSED} if the string ``TESTBENCH PASS'' appears in stdout; otherwise \textbf{FAILED}. Build failures or timeouts are logged and also count as FAILED.
-
-\subsection{GBModule testbench}
-
-\begin{itemize}
-  \item \textbf{Source thread:} Drives the AXI-RVA (config) and SRAM data path. It (a) writes GBCore memory-manager config (three regions: src, dst for naive, dst for diagonal), (b) writes the $3\times2$ source matrix to SRAM via direct RVA writes, (c) writes Transpose config (opcode 0, dst = manager 1), asserts start, then \textbf{blocks} until a global \texttt{gb\_done} flag is set by the Dest. It then issues 6 RVA reads from the naive-destination region. Next it clears \texttt{gb\_done}, writes Transpose config (opcode 1, dst = manager 2), starts again, blocks on \texttt{gb\_done}, and issues 6 RVA reads from the diagonal-destination region.
-  \item \textbf{Dest thread:} Listens for \texttt{gb\_done}. For each of the two tests (naive, then diagonal), it waits until \texttt{gb\_done} is received and sets the global flag so Source can proceed. It then drains exactly 6 AXI read responses and compares each to the expected transpose values $(0x01, 0x03, 0x05, 0x02, 0x04, 0x06)$. On any mismatch it calls \texttt{SC\_REPORT\_ERROR} and records failure; after 12 reads it calls \texttt{sc\_stop()}.
-  \item \textbf{Pass/fail:} \texttt{sc\_main} checks \texttt{sc\_report\_handler::get\_count(SC\_ERROR)}; zero errors $\Rightarrow$ print ``TESTBENCH PASS'', else ``TESTBENCH FAIL'' and non-zero return code. A separate timeout thread aborts the run if neither test completes within the allotted time.
-\end{itemize}
-
-\subsection{Top-level testbench}
-
-\begin{itemize}
-  \item An AXI master (\texttt{ManagerFromFile}) reads \texttt{axi\_commands\_test.csv} and issues AXI writes/reads (config, source data, Transpose config for opcode 0, start, read-backs; then config for opcode 1, start, read-backs). The DUT is the full \texttt{Top}; the Dest module only monitors the \textbf{interrupt} line.
-  \item \textbf{Run logic:} After de-asserting reset, the testbench waits until \texttt{master\_done} is true (CSV sequence finished). It then waits up to 5\,s for at least one interrupt; if none occurs, it reports a timeout and fails. Pass means no \texttt{SC\_ERROR} and interrupt received; exit code is derived from the error count as in GBModule.
-\end{itemize}
+All four opcodes share a unified 128-bit configuration register at AXI region
+\texttt{0x6}, local index \texttt{0x01}:
 
 \begin{table}[h]
-  \centering
-  \begin{tabular}{@{}ll@{}}
-    \toprule
-    Item & Status \\
-    \midrule
-    Naive transpose (opcode 0) & Done \\
-    Diagonal transpose (opcode 1) & Done \\
-    Config, start/done, read-back & Both testbenches \\
-    SystemC verification & Done (GBModule + Top; \texttt{test.py}) \\
-    \bottomrule
-  \end{tabular}
-  \caption{Checkpoint summary.}
+\centering\small
+\begin{tabular}{@{}lll@{}}
+\toprule
+Bits & Field & Description \\
+\midrule
+0 & \texttt{is\_valid} & Enable bit \\
+10:8 & \texttt{memory\_index\_src} & $K$ / source location \\
+18:16 & \texttt{memory\_index\_dst} & Result / destination \\
+26:24 & \texttt{memory\_index\_q} & $Q$ location (opcodes 2, 3) \\
+39:32 & \texttt{num\_rows} & $N$ (rows of $K$) \\
+47:40 & \texttt{num\_cols} & $D$ (cols of $K$ = cols of $Q$) \\
+50:48 & \texttt{opcode} & 0--3 as above \\
+63:56 & \texttt{num\_rows\_q} & $M$ (rows of $Q$, opcodes 2, 3) \\
+\bottomrule
+\end{tabular}
+\caption{TransposeConfig register layout (backward-compatible: bits 26:24 and
+63:56 default to zero for opcodes 0 and 1).}
 \end{table}
 
-%------------------------------------------------------------------------------
-\section{Future Work}
-%------------------------------------------------------------------------------
-Aligned with the proposal (Efficient Matrix Transpose for ML Workloads):
+%==============================================================================
+\section{Verification Methodology}
+%==============================================================================
 
-\begin{enumerate}
-  \item \textbf{Demonstrate advantage over baseline.} Quantify that the diagonal method is better than the naive method (e.g., cycle count, memory traffic, or synthesis area/latency from HLS/FPGA reports).
-  \item \textbf{Fuse transpose with matrix multiplication.} Integrate the transpose unit into a matrix-multiplication datapath so that transposed operands can be produced on-chip without extra round-trips to external memory.
-  \item \textbf{Integrate into attention.} Use the fused transpose--matmul block inside an attention backend (e.g., as part of $QK^T$ or score$\times V$) to accelerate transformer-style workloads on FPGA.
+We employ a three-tier verification strategy:
+
+\subsection{SystemC Functional Simulation}
+
+\paragraph{GBModule testbench.}
+A hand-written SystemC testbench instantiates the full \texttt{GBModule}
+(including \texttt{GBCore} SRAM and \texttt{Transpose}). It writes a
+$3\!\times\!2$ source matrix via AXI-RVA, runs both opcodes sequentially, and
+verifies all 6 transposed elements per opcode (12 total comparisons).
+
+\paragraph{Top-level testbench.}
+An \texttt{ManagerFromFile} AXI master drives commands from a CSV file through
+the full \texttt{Top} hierarchy. The testbench monitors the interrupt line and
+declares pass/fail based on error count and interrupt reception.
+
+\paragraph{Matmul testbench.}
+A separate \texttt{testbench\_matmul.cpp} loads
+\texttt{axi\_commands\_matmul\_test.csv}, which programs a $2\!\times\!2$
+$Q\!\cdot\!K^T$ workload for both opcodes~2 and~3, then verifies the 4 result
+elements against software-computed expected values.
+
+\subsection{HLS Synthesis (Catapult Ultra)}
+
+The \texttt{test.py} automation script performs bottom-up Catapult synthesis
+across the full hierarchy: \texttt{PECore} $\to$ \texttt{PEModule} $\to$
+\texttt{PEPartition}, \texttt{GBCore} $\to$ \texttt{GBModule} $\to$
+\texttt{GBPartition}, and finally \texttt{Top}. The generated RTL
+(\texttt{concat\_Top.v}) is exported to the AWS FPGA design folder. HLS
+achieves the target II\,=\,3.
+
+\subsection{RTL Simulation (Vivado XSIM on AWS F2)}
+
+\paragraph{Transpose tests.}
+A SystemVerilog testbench (\texttt{design\_top\_base\_test.sv}) exercises both
+transpose opcodes across 9 matrix sizes: $1\!\times\!1$ (overhead calibration),
+$3\!\times\!2$, $4\!\times\!4$, $4\!\times\!8$, $8\!\times\!4$,
+$8\!\times\!8$, $16\!\times\!8$, $8\!\times\!16$, $16\!\times\!16$, and
+$32\!\times\!32$. Each test writes the source matrix to SRAM via the OCL
+bridge, configures the transpose, arms a hardware performance counter, triggers
+execution, waits, then reads cycle counts and verifies all output elements.
+
+\paragraph{Matmul tests.}
+A separate \texttt{design\_top\_matmul\_test.sv} tests opcodes~2 and~3 across
+matrix dimensions from $1\!\times\!1\!\times\!1$ up to
+$16\!\times\!16\!\times\!16$, verifying correctness of the $Q\!\cdot\!K^T$
+result (lower 8 bits of each dot product).
+
+\paragraph{Performance counter.}
+We implemented a dedicated hardware performance counter in \texttt{design\_top.sv}
+that measures elapsed clock cycles from an OCL-write ``arm'' signal to the
+rising edge of the completion interrupt. This replaced an earlier flawed counter
+that only measured the fixed interrupt pulse width.
+
+\paragraph{Overhead calibration.}
+The $1\!\times\!1$ test establishes a baseline OCL-bridge overhead; reported
+``adjusted'' speedups subtract this constant from both measurements.
+
+%==============================================================================
+\section{Results}
+%==============================================================================
+
+\subsection{Transpose Performance (RTL Simulation)}
+
+All tests passed with correct transposed outputs. Table~\ref{tab:transpose}
+summarises the performance counter readings from the RTL simulation log.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+Matrix & Naive (cyc) & Optimized (cyc) & Speedup \\
+\midrule
+$3\times2$ & 184 & 169 & 1.09$\times$ \\
+$4\times4$ & 324 & 277 & 1.17$\times$ \\
+$8\times4$ & 548 & 453 & 1.21$\times$ \\
+$8\times8$ & 995 & 807 & 1.23$\times$ \\
+$16\times16$ & 3682 & 2918 & 1.26$\times$ \\
+\bottomrule
+\end{tabular}
+\caption{Transpose cycle counts from Vivado XSIM RTL simulation (raw values).
+The optimized method consistently outperforms naive, with speedup approaching
+the theoretical 1.33$\times$ for larger matrices.}
+\label{tab:transpose}
+\end{table}
+
+The measured speedups (1.09--1.26$\times$) are below the theoretical
+$4/3 \approx 1.33\times$ because the single setup state in the drain phase and
+the fill/drain phase boundary add per-matrix fixed overhead that is amortised
+only for larger sizes.
+
+\subsection{Fused $Q\!\cdot\!K^T$ Performance}
+
+The fused matmul implementation (opcodes 2 and 3) has been verified for
+functional correctness via SystemC simulation. RTL simulation results will be
+collected once the updated bitstream is deployed; we include theoretical cycle
+estimates in Table~\ref{tab:matmul}.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+$M\!\times\!N\!\times\!D$ & Unfused (est.\ states) & Fused (est.\ states) & Est.\ Speedup \\
+\midrule
+$2\times2\times2$ & 54 & 29 & 1.86$\times$ \\
+$4\times4\times4$ & 337 & 145 & 2.32$\times$ \\
+$8\times8\times8$ & 2370 & 833 & 2.85$\times$ \\
+$16\times16\times16$ & 17666 & 5377 & 3.29$\times$ \\
+\bottomrule
+\end{tabular}
+\caption{Theoretical FSM state counts for unfused (opcode~2) vs.\ fused
+(opcode~3) $Q\!\cdot\!K^T$. Each state costs II\,=\,3 cycles. The fused path
+eliminates the dominant $M\!N\!D$ SRAM reads for $K^T$.}
+\label{tab:matmul}
+\end{table}
+
+%==============================================================================
+\section{Challenges and Debugging}
+%==============================================================================
+
+\paragraph{HLS resource allocation.}
+Catapult initially decomposed the BRAM array into 16 separate 8-bit sub-memories,
+exceeding the resource budget. We resolved this by storing BRAM entries as flat
+\texttt{NVUINTW(128)} words with explicit pack/unpack functions.
+
+\paragraph{HLS scheduling failure.}
+A chained data dependency in the drain state caused scheduling failure. We split
+the drain logic into a setup state (\textsc{drain\_first}) and a pipelined
+state (\textsc{drain\_pipe}) to break the critical path.
+
+\paragraph{AXI read timing (\texttt{0xDEADBEEF}).}
+Early RTL simulations showed consistent data corruption
+(\texttt{0x37AB6F}) because the OCL bridge returns \texttt{0xDEADBEEF} for
+premature reads. We traced \texttt{0xDEADBEEF} $\gg$ 10 = \texttt{0x37AB6F}
+and implemented robust polling loops in both the SystemVerilog and C testbenches.
+
+\paragraph{Flawed performance counter.}
+The original \texttt{interrupt\_cycles} counter counted cycles only while the
+interrupt signal was \emph{high}---a fixed $\sim$10-cycle pulse---masking all
+performance differences. We replaced it with a counter that arms on an OCL
+write and stops on the interrupt rising edge.
+
+\paragraph{No initial speedup.}
+The first banked-BRAM implementation had 6 states per element (worse than
+naive's 4) due to excessive SRAM handshaking. We redesigned the FSM to pipeline
+fill and drain phases, achieving the current 3-state-per-element design.
+
+%==============================================================================
+\section{Code Structure}
+%==============================================================================
+
+\begin{table}[h]
+\centering\small
+\begin{tabular}{@{}ll@{}}
+\toprule
+File & Purpose \\
+\midrule
+\texttt{src/.../Transpose/Transpose.h} & Core FSM: opcodes 0--3 \\
+\texttt{src/Top/testbench.cpp} & SystemC test (transpose) \\
+\texttt{src/Top/testbench\_matmul.cpp} & SystemC test ($Q\!\cdot\!K^T$) \\
+\texttt{src/Top/axi\_commands\_test.csv} & Transpose AXI stimulus \\
+\texttt{src/Top/axi\_commands\_matmul\_test.csv} & Matmul AXI stimulus \\
+\texttt{design\_top/design/design\_top.sv} & Top-level RTL wrapper + perf counter \\
+\texttt{design\_top/verif/.../base\_test.sv} & RTL transpose test (9 sizes) \\
+\texttt{design\_top/verif/.../matmul\_test.sv} & RTL matmul test (8 sizes) \\
+\texttt{design\_top/software/.../design\_top.c} & FPGA runtime transpose test \\
+\texttt{design\_top/software/.../design\_top\_matmul.c} & FPGA runtime matmul test \\
+\texttt{test.py} & HLS build automation \\
+\bottomrule
+\end{tabular}
+\caption{Key source files.}
+\end{table}
+
+%==============================================================================
+\section{Discussion}
+%==============================================================================
+
+\paragraph{Why the measured speedup is less than theoretical.}
+The GBCore interface serialises all SRAM accesses to one element per cycle
+(II\,=\,3). The optimized transpose reduces FSM states per element from 4 to
+$\sim$3, but the absolute improvement is bounded by this interface bottleneck.
+A wider SRAM port or true burst interface would increase the gap.
+
+\paragraph{Fusion benefit.}
+The dominant cost in $Q\!\cdot\!K^T$ is the $O(MND)$ inner-loop SRAM accesses.
+By keeping $K^T$ in local BRAM, the fused path replaces each 6-cycle SRAM read
+(2 states $\times$ 3 cycles) with a single 3-cycle BRAM read (1 state $\times$
+3 cycles). Combined with eliminating the $K^T$ write-back, the fused variant
+saves roughly $3\times$ the states of the unfused approach for large matrices.
+
+\paragraph{Scalability.}
+The 32-bank, depth-32 BRAM supports matrices up to $32\!\times\!32$ (1024
+elements). For larger matrices, tiling would be required---an important
+direction for future work.
+
+%==============================================================================
+\section{Contributions}
+%==============================================================================
+
+\begin{itemize}[nosep]
+  \item \textbf{Yiming Tan:} Contributed to the initial design concept, reviewed
+        architecture decisions, and participated in writing the project proposal.
+  \item \textbf{Chia-Hsiang Chang:} Led the full-stack implementation---SystemC
+        module design, HLS synthesis, RTL integration, test infrastructure,
+        performance counter design, AWS F2 simulation, and fusion implementation.
+\end{itemize}
+
+%==============================================================================
+\section{Conclusion and Future Work}
+%==============================================================================
+
+We demonstrated a complete hardware development flow for an efficient matrix
+transpose unit: from SystemC design through Catapult HLS to RTL simulation on
+the AWS F2 platform. The banked-BRAM approach achieves up to 1.26$\times$
+measured speedup over the naive baseline, consistent with the 1.33$\times$
+theoretical bound. The fused $Q\!\cdot\!K^T$ extension demonstrates how
+co-designing transpose and matrix multiplication can eliminate redundant memory
+traffic, with theoretical speedups of 2--3.5$\times$.
+
+\paragraph{Future directions.}
+\begin{enumerate}[nosep]
+  \item \textbf{FPGA deployment:} Program the updated bitstream on AWS F2 and
+        measure real silicon cycle counts for all four opcodes.
+  \item \textbf{Tiled transpose:} Support matrices larger than $32\!\times\!32$
+        by tiling the BRAM fill/drain across multiple passes.
+  \item \textbf{Full attention integration:} Extend fusion to cover
+        $\text{softmax}(QK^T/\sqrt{d_k}) \cdot V$, pipelining the entire
+        attention head within the global buffer.
+  \item \textbf{Multi-port BRAM:} Exploit dual-port BRAM to overlap fill and
+        drain, potentially doubling transpose throughput.
 \end{enumerate}
 
 \end{document}

@@ -7,6 +7,10 @@ hw_sim:
 	mkdir -p $(LOGS_DIR)
 	cd $(CL_DIR)/verif/scripts && make ${CL_DESIGN_NAME}_base_test | tee $(LOGS_DIR)/f2_hw_sim.log.txt
 
+hw_sim_matmul:
+	mkdir -p $(LOGS_DIR)
+	cd $(CL_DIR)/verif/scripts && make ${CL_DESIGN_NAME}_matmul_test | tee $(LOGS_DIR)/f2_hw_sim_matmul.log.txt
+
 fpga_build:
 	cd $(CL_DIR)/design/ && sed -i '\|// synopsys translate|d' concat_$(DESIGN_NAME).v 
 	cd $(CL_DIR)/build/scripts && ./aws_build_dcp_from_cl.py -c $(CL_DESIGN_NAME)
@@ -26,6 +30,9 @@ program_fpga:
 
 run_fpga_test:
 	cd $(CL_DIR)/software/runtime && make clean && make $(CL_DESIGN_NAME) && sudo ./$(CL_DESIGN_NAME) 0 | tee $(LOGS_DIR)/fpga_test.log.txt 
+
+run_fpga_matmul_test:
+	cd $(CL_DIR)/software/runtime && make clean && make $(CL_DESIGN_NAME)_matmul && sudo ./$(CL_DESIGN_NAME)_matmul 0 | tee $(LOGS_DIR)/fpga_matmul_test.log.txt 
 
 clean:
 	cd $(CL_DIR)/verif/scripts && make clean

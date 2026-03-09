@@ -20,6 +20,6 @@
 design_top_base_test: TEST=design_top_base_test
 design_top_base_test: all
 
-# Add additional tests here that are located in the $CL_DIR/verif/tests directory
-# module_name_of_new_test: TEST=module_name_of_new_test
-# module_name_of_new_test: all
+# Matmul Q*K^T test (unfused vs fused)
+design_top_matmul_test: TEST=design_top_matmul_test
+design_top_matmul_test: all

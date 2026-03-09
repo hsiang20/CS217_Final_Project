@@ -36,7 +36,7 @@ GLOBAL_ATG_OFFSET=-DGLOBAL_ATG_OFFSET=0x0
 OPT=-DFPGA_ALLOW_NON_ROOT -DCONFIG_LOGLEVEL=1 $(GLOBAL_SDE_OFFSET) $(GLOBAL_ATG_OFFSET)
 CFLAGS=$(OPT) -g -Wall -Werror -W -Wno-parentheses -Wstrict-prototypes -Wmissing-prototypes $(INCLUDES)
 SRC=$(SDE_LIB_DIR)/sde_hw_ctrl.c $(SDE_LIB_DIR)/sde_dma_buffer.c $(SDE_LIB_DIR)/sde_mgmt.c $(SDE_LIB_DIR)/sde_utility.c $(SDE_LIB_DIR)/sde_mem.c
-SDE_EXAMPLES = design_top
+SDE_EXAMPLES = design_top design_top_matmul
 
 .PHONY: all clean
 
@@ -62,4 +62,7 @@ ifndef HDK_DIR
     $(error HDK_DIR is undefined. Try "source hdk_setup.sh" to set the software environment)
 endif
 design_top: $(SDE_EXAMPLE_DIR)/design_top.c $(SRC) check_env
+	gcc $< $(SRC) -o $@ -mavx2 $(LDFLAGS) $(LDLIBS) $(CFLAGS) -lm
+
+design_top_matmul: $(SDE_EXAMPLE_DIR)/design_top_matmul.c $(SRC) check_env
 	gcc $< $(SRC) -o $@ -mavx2 $(LDFLAGS) $(LDLIBS) $(CFLAGS) -lm
