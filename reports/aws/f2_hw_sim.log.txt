@@ -1849,7 +1849,7 @@ cd /home/ubuntu/CS217_Final_Project/design_top/verif/sim/xsim/design_top_base_te
   **** SW Build 5076996 on Wed May 22 18:36:09 MDT 2024
   **** IP Build 5075265 on Wed May 22 21:45:21 MDT 2024
   **** SharedData Build 5076995 on Wed May 22 18:29:18 MDT 2024
-  **** Start of session at: Sun Mar  8 23:32:10 2026
+  **** Start of session at: Mon Mar  9 01:33:08 2026
     ** Copyright 1986-2022 Xilinx, Inc. All Rights Reserved.
     ** Copyright 2022-2024 Advanced Micro Devices, Inc. All Rights Reserved.
 source xsim.dir/tb/xsim_script.tcl
@@ -2304,151 +2304,813 @@ Model based on DDR4 DDS version 0.999 6/06/2014 (build data 5/06/2016)
 tb.card.u_ddr4_rdimm.rcd_enabled.NOT_LRDIMM.u_ddr4_dimm.rank_instances[1].mc_ca_mirroring_odd_rank.u_ddr4_rank.Micron_model.instance_of_sdram_devices[17].micron_mem_model.u_ddr4_model:Configured as x4 16G stack:1
 ===== GBControl config =====
 =========================================================
- Test: 1x1  (1 x 1)  src=0  naive_dst=1  opt_dst=2
-=========================================================
-  Writing source matrix ...
-  Running naive transpose (opcode 0) ...
-  Verifying naive result (mem=1) ...
-Error: MISMATCH addr=0x33500400  got=0x0101010101010101010101010137ab6f  exp=0x01010101010101010101010101010101
-Time: 14950 ns  Iteration: 0  Process: /design_top_base_test/top_read  Scope: design_top_base_test.top_read  File: /home/ubuntu/CS217_Final_Project/design_top/verif/tests/design_top_base_test.sv Line: 79
-  Naive wall time: 5730.000 ns
-  Running optimized transpose (opcode 1, banked BRAM) ...
-  Verifying optimized result (mem=2) ...
-Error: MISMATCH addr=0x33500800  got=0x0101010101010101010101010137ab6f  exp=0x01010101010101010101010101010101
-Time: 21940 ns  Iteration: 0  Process: /design_top_base_test/top_read  Scope: design_top_base_test.top_read  File: /home/ubuntu/CS217_Final_Project/design_top/verif/tests/design_top_base_test.sv Line: 79
-  Optimized wall time: 5730.000 ns
-=========================================================
- Test: 2x3  (2 x 3)  src=0  naive_dst=1  opt_dst=2
-=========================================================
-  Writing source matrix ...
-  Running naive transpose (opcode 0) ...
-  Verifying naive result (mem=1) ...
-Error: MISMATCH addr=0x33500400  got=0x0101010101010101010101010137ab6f  exp=0x01010101010101010101010101010101
-Time: 33310 ns  Iteration: 0  Process: /design_top_base_test/top_read  Scope: design_top_base_test.top_read  File: /home/ubuntu/CS217_Final_Project/design_top/verif/tests/design_top_base_test.sv Line: 79
-  PASS addr=0x33500410
-Error: MISMATCH addr=0x33500420  got=0x0303030303030303030303030337ab6f  exp=0x03030303030303030303030303030303
-Time: 34370 ns  Iteration: 0  Process: /design_top_base_test/top_read  Scope: design_top_base_test.top_read  File: /home/ubuntu/CS217_Final_Project/design_top/verif/tests/design_top_base_test.sv Line: 79
-Error: MISMATCH addr=0x33500500  got=0x0404040404040404040404040437ab6f  exp=0x04040404040404040404040404040404
-Time: 34900 ns  Iteration: 0  Process: /design_top_base_test/top_read  Scope: design_top_base_test.top_read  File: /home/ubuntu/CS217_Final_Project/design_top/verif/tests/design_top_base_test.sv Line: 79
-Error: MISMATCH addr=0x33500510  got=0x0505050505050505050505050537ab6f  exp=0x05050505050505050505050505050505
-Time: 35430 ns  Iteration: 0  Process: /design_top_base_test/top_read  Scope: design_top_base_test.top_read  File: /home/ubuntu/CS217_Final_Project/design_top/verif/tests/design_top_base_test.sv Line: 79
-  PASS addr=0x33500520
-  Naive wall time: 5730.000 ns
-  Running optimized transpose (opcode 1, banked BRAM) ...
-  Verifying optimized result (mem=2) ...
-Error: MISMATCH addr=0x33500800  got=0x0101010101010101010101010137ab6f  exp=0x01010101010101010101010101010101
-Time: 42950 ns  Iteration: 0  Process: /design_top_base_test/top_read  Scope: design_top_base_test.top_read  File: /home/ubuntu/CS217_Final_Project/design_top/verif/tests/design_top_base_test.sv Line: 79
-  PASS addr=0x33500810
-Error: MISMATCH addr=0x33500820  got=0x0303030303030303030303030337ab6f  exp=0x03030303030303030303030303030303
-Time: 44010 ns  Iteration: 0  Process: /design_top_base_test/top_read  Scope: design_top_base_test.top_read  File: /home/ubuntu/CS217_Final_Project/design_top/verif/tests/design_top_base_test.sv Line: 79
-Error: MISMATCH addr=0x33500900  got=0x0404040404040404040404040437ab6f  exp=0x04040404040404040404040404040404
-Time: 44540 ns  Iteration: 0  Process: /design_top_base_test/top_read  Scope: design_top_base_test.top_read  File: /home/ubuntu/CS217_Final_Project/design_top/verif/tests/design_top_base_test.sv Line: 79
-Error: MISMATCH addr=0x33500910  got=0x0505050505050505050505050537ab6f  exp=0x05050505050505050505050505050505
-Time: 45070 ns  Iteration: 0  Process: /design_top_base_test/top_read  Scope: design_top_base_test.top_read  File: /home/ubuntu/CS217_Final_Project/design_top/verif/tests/design_top_base_test.sv Line: 79
-  PASS addr=0x33500920
-  Optimized wall time: 5730.000 ns
-=========================================================
  Test: 3x2  (3 x 2)  src=0  naive_dst=1  opt_dst=2
 =========================================================
   Writing source matrix ...
   Running naive transpose (opcode 0) ...
   Verifying naive result (mem=1) ...
-Error: MISMATCH addr=0x33500400  got=0x0101010101010101010101010137ab6f  exp=0x01010101010101010101010101010101
-Time: 56970 ns  Iteration: 0  Process: /design_top_base_test/top_read  Scope: design_top_base_test.top_read  File: /home/ubuntu/CS217_Final_Project/design_top/verif/tests/design_top_base_test.sv Line: 79
-Error: MISMATCH addr=0x33500410  got=0x0202020202020202020202020237ab6f  exp=0x02020202020202020202020202020202
-Time: 57500 ns  Iteration: 0  Process: /design_top_base_test/top_read  Scope: design_top_base_test.top_read  File: /home/ubuntu/CS217_Final_Project/design_top/verif/tests/design_top_base_test.sv Line: 79
-Error: MISMATCH addr=0x33500500  got=0x0303030303030303030303030337ab6f  exp=0x03030303030303030303030303030303
-Time: 58030 ns  Iteration: 0  Process: /design_top_base_test/top_read  Scope: design_top_base_test.top_read  File: /home/ubuntu/CS217_Final_Project/design_top/verif/tests/design_top_base_test.sv Line: 79
-  PASS addr=0x33500510
-Error: MISMATCH addr=0x33500600  got=0x0505050505050505050505050537ab6f  exp=0x05050505050505050505050505050505
-Time: 59090 ns  Iteration: 0  Process: /design_top_base_test/top_read  Scope: design_top_base_test.top_read  File: /home/ubuntu/CS217_Final_Project/design_top/verif/tests/design_top_base_test.sv Line: 79
-Error: MISMATCH addr=0x33500610  got=0x0606060606060606060606060637ab6f  exp=0x06060606060606060606060606060606
-Time: 59620 ns  Iteration: 0  Process: /design_top_base_test/top_read  Scope: design_top_base_test.top_read  File: /home/ubuntu/CS217_Final_Project/design_top/verif/tests/design_top_base_test.sv Line: 79
-  Naive wall time: 5730.000 ns
+  PASS addr=0x33501000
+  PASS addr=0x33501010
+  PASS addr=0x33501100
+  PASS addr=0x33501110
+  PASS addr=0x33501200
+  PASS addr=0x33501210
+  Naive interrupt cycles: 10
   Running optimized transpose (opcode 1, banked BRAM) ...
   Verifying optimized result (mem=2) ...
-Error: MISMATCH addr=0x33500800  got=0x0101010101010101010101010137ab6f  exp=0x01010101010101010101010101010101
-Time: 66610 ns  Iteration: 0  Process: /design_top_base_test/top_read  Scope: design_top_base_test.top_read  File: /home/ubuntu/CS217_Final_Project/design_top/verif/tests/design_top_base_test.sv Line: 79
-Error: MISMATCH addr=0x33500810  got=0x0202020202020202020202020237ab6f  exp=0x02020202020202020202020202020202
-Time: 67140 ns  Iteration: 0  Process: /design_top_base_test/top_read  Scope: design_top_base_test.top_read  File: /home/ubuntu/CS217_Final_Project/design_top/verif/tests/design_top_base_test.sv Line: 79
-Error: MISMATCH addr=0x33500900  got=0x0303030303030303030303030337ab6f  exp=0x03030303030303030303030303030303
-Time: 67670 ns  Iteration: 0  Process: /design_top_base_test/top_read  Scope: design_top_base_test.top_read  File: /home/ubuntu/CS217_Final_Project/design_top/verif/tests/design_top_base_test.sv Line: 79
-  PASS addr=0x33500910
-Error: MISMATCH addr=0x33500a00  got=0x0505050505050505050505050537ab6f  exp=0x05050505050505050505050505050505
-Time: 68730 ns  Iteration: 0  Process: /design_top_base_test/top_read  Scope: design_top_base_test.top_read  File: /home/ubuntu/CS217_Final_Project/design_top/verif/tests/design_top_base_test.sv Line: 79
-Error: MISMATCH addr=0x33500a10  got=0x0606060606060606060606060637ab6f  exp=0x06060606060606060606060606060606
-Time: 69260 ns  Iteration: 0  Process: /design_top_base_test/top_read  Scope: design_top_base_test.top_read  File: /home/ubuntu/CS217_Final_Project/design_top/verif/tests/design_top_base_test.sv Line: 79
-  Optimized wall time: 5730.000 ns
+  PASS addr=0x33502000
+  PASS addr=0x33502010
+  PASS addr=0x33502100
+  PASS addr=0x33502110
+  PASS addr=0x33502200
+  PASS addr=0x33502210
+  Optimized interrupt cycles: 10
+  >> 3x2 (3x2): naive=10 cyc, optimized=10 cyc, speedup=1.00x
 =========================================================
  Test: 4x4  (4 x 4)  src=0  naive_dst=1  opt_dst=2
 =========================================================
   Writing source matrix ...
   Running naive transpose (opcode 0) ...
   Verifying naive result (mem=1) ...
-Error: MISMATCH addr=0x33500400  got=0x0101010101010101010101010137ab6f  exp=0x01010101010101010101010101010101
-Time: 87930 ns  Iteration: 0  Process: /design_top_base_test/top_read  Scope: design_top_base_test.top_read  File: /home/ubuntu/CS217_Final_Project/design_top/verif/tests/design_top_base_test.sv Line: 79
-Error: MISMATCH addr=0x33500410  got=0x0202020202020202020202020237ab6f  exp=0x02020202020202020202020202020202
-Time: 88460 ns  Iteration: 0  Process: /design_top_base_test/top_read  Scope: design_top_base_test.top_read  File: /home/ubuntu/CS217_Final_Project/design_top/verif/tests/design_top_base_test.sv Line: 79
-Error: MISMATCH addr=0x33500420  got=0x0303030303030303030303030337ab6f  exp=0x03030303030303030303030303030303
-Time: 88990 ns  Iteration: 0  Process: /design_top_base_test/top_read  Scope: design_top_base_test.top_read  File: /home/ubuntu/CS217_Final_Project/design_top/verif/tests/design_top_base_test.sv Line: 79
-  PASS addr=0x33500430
-Error: MISMATCH addr=0x33500500  got=0x0505050505050505050505050537ab6f  exp=0x05050505050505050505050505050505
-Time: 90050 ns  Iteration: 0  Process: /design_top_base_test/top_read  Scope: design_top_base_test.top_read  File: /home/ubuntu/CS217_Final_Project/design_top/verif/tests/design_top_base_test.sv Line: 79
-Error: MISMATCH addr=0x33500510  got=0x0606060606060606060606060637ab6f  exp=0x06060606060606060606060606060606
-Time: 90580 ns  Iteration: 0  Process: /design_top_base_test/top_read  Scope: design_top_base_test.top_read  File: /home/ubuntu/CS217_Final_Project/design_top/verif/tests/design_top_base_test.sv Line: 79
-Error: MISMATCH addr=0x33500520  got=0x0707070707070707070707070737ab6f  exp=0x07070707070707070707070707070707
-Time: 91110 ns  Iteration: 0  Process: /design_top_base_test/top_read  Scope: design_top_base_test.top_read  File: /home/ubuntu/CS217_Final_Project/design_top/verif/tests/design_top_base_test.sv Line: 79
-  PASS addr=0x33500530
-Error: MISMATCH addr=0x33500600  got=0x0909090909090909090909090937ab6f  exp=0x09090909090909090909090909090909
-Time: 92170 ns  Iteration: 0  Process: /design_top_base_test/top_read  Scope: design_top_base_test.top_read  File: /home/ubuntu/CS217_Final_Project/design_top/verif/tests/design_top_base_test.sv Line: 79
-Error: MISMATCH addr=0x33500610  got=0x0a0a0a0a0a0a0a0a0a0a0a0a0a37ab6f  exp=0x0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a
-Time: 92700 ns  Iteration: 0  Process: /design_top_base_test/top_read  Scope: design_top_base_test.top_read  File: /home/ubuntu/CS217_Final_Project/design_top/verif/tests/design_top_base_test.sv Line: 79
-Error: MISMATCH addr=0x33500620  got=0x0b0b0b0b0b0b0b0b0b0b0b0b0b37ab6f  exp=0x0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b
-Time: 93230 ns  Iteration: 0  Process: /design_top_base_test/top_read  Scope: design_top_base_test.top_read  File: /home/ubuntu/CS217_Final_Project/design_top/verif/tests/design_top_base_test.sv Line: 79
-  PASS addr=0x33500630
-Error: MISMATCH addr=0x33500700  got=0x0d0d0d0d0d0d0d0d0d0d0d0d0d37ab6f  exp=0x0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d
-Time: 94290 ns  Iteration: 0  Process: /design_top_base_test/top_read  Scope: design_top_base_test.top_read  File: /home/ubuntu/CS217_Final_Project/design_top/verif/tests/design_top_base_test.sv Line: 79
-Error: MISMATCH addr=0x33500710  got=0x0e0e0e0e0e0e0e0e0e0e0e0e0e37ab6f  exp=0x0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e
-Time: 94820 ns  Iteration: 0  Process: /design_top_base_test/top_read  Scope: design_top_base_test.top_read  File: /home/ubuntu/CS217_Final_Project/design_top/verif/tests/design_top_base_test.sv Line: 79
-Error: MISMATCH addr=0x33500720  got=0x0f0f0f0f0f0f0f0f0f0f0f0f0f37ab6f  exp=0x0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f
-Time: 95350 ns  Iteration: 0  Process: /design_top_base_test/top_read  Scope: design_top_base_test.top_read  File: /home/ubuntu/CS217_Final_Project/design_top/verif/tests/design_top_base_test.sv Line: 79
-  PASS addr=0x33500730
-  Naive wall time: 5730.000 ns
+  PASS addr=0x33501000
+  PASS addr=0x33501010
+  PASS addr=0x33501020
+  PASS addr=0x33501030
+  PASS addr=0x33501100
+  PASS addr=0x33501110
+  PASS addr=0x33501120
+  PASS addr=0x33501130
+  PASS addr=0x33501200
+  PASS addr=0x33501210
+  PASS addr=0x33501220
+  PASS addr=0x33501230
+  PASS addr=0x33501300
+  PASS addr=0x33501310
+  PASS addr=0x33501320
+  PASS addr=0x33501330
+  Naive interrupt cycles: 10
   Running optimized transpose (opcode 1, banked BRAM) ...
   Verifying optimized result (mem=2) ...
-Error: MISMATCH addr=0x33500800  got=0x0101010101010101010101010137ab6f  exp=0x01010101010101010101010101010101
-Time: 102870 ns  Iteration: 0  Process: /design_top_base_test/top_read  Scope: design_top_base_test.top_read  File: /home/ubuntu/CS217_Final_Project/design_top/verif/tests/design_top_base_test.sv Line: 79
-  PASS addr=0x33500810
-Error: MISMATCH addr=0x33500820  got=0x0303030303030303030303030337ab6f  exp=0x03030303030303030303030303030303
-Time: 103930 ns  Iteration: 0  Process: /design_top_base_test/top_read  Scope: design_top_base_test.top_read  File: /home/ubuntu/CS217_Final_Project/design_top/verif/tests/design_top_base_test.sv Line: 79
-Error: MISMATCH addr=0x33500830  got=0x0404040404040404040404040437ab6f  exp=0x04040404040404040404040404040404
-Time: 104460 ns  Iteration: 0  Process: /design_top_base_test/top_read  Scope: design_top_base_test.top_read  File: /home/ubuntu/CS217_Final_Project/design_top/verif/tests/design_top_base_test.sv Line: 79
-Error: MISMATCH addr=0x33500900  got=0x0505050505050505050505050537ab6f  exp=0x05050505050505050505050505050505
-Time: 104990 ns  Iteration: 0  Process: /design_top_base_test/top_read  Scope: design_top_base_test.top_read  File: /home/ubuntu/CS217_Final_Project/design_top/verif/tests/design_top_base_test.sv Line: 79
-  PASS addr=0x33500910
-Error: MISMATCH addr=0x33500920  got=0x0707070707070707070707070737ab6f  exp=0x07070707070707070707070707070707
-Time: 106050 ns  Iteration: 0  Process: /design_top_base_test/top_read  Scope: design_top_base_test.top_read  File: /home/ubuntu/CS217_Final_Project/design_top/verif/tests/design_top_base_test.sv Line: 79
-Error: MISMATCH addr=0x33500930  got=0x0808080808080808080808080837ab6f  exp=0x08080808080808080808080808080808
-Time: 106580 ns  Iteration: 0  Process: /design_top_base_test/top_read  Scope: design_top_base_test.top_read  File: /home/ubuntu/CS217_Final_Project/design_top/verif/tests/design_top_base_test.sv Line: 79
-Error: MISMATCH addr=0x33500a00  got=0x0909090909090909090909090937ab6f  exp=0x09090909090909090909090909090909
-Time: 107110 ns  Iteration: 0  Process: /design_top_base_test/top_read  Scope: design_top_base_test.top_read  File: /home/ubuntu/CS217_Final_Project/design_top/verif/tests/design_top_base_test.sv Line: 79
-  PASS addr=0x33500a10
-Error: MISMATCH addr=0x33500a20  got=0x0b0b0b0b0b0b0b0b0b0b0b0b0b37ab6f  exp=0x0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b
-Time: 108170 ns  Iteration: 0  Process: /design_top_base_test/top_read  Scope: design_top_base_test.top_read  File: /home/ubuntu/CS217_Final_Project/design_top/verif/tests/design_top_base_test.sv Line: 79
-Error: MISMATCH addr=0x33500a30  got=0x0c0c0c0c0c0c0c0c0c0c0c0c0c37ab6f  exp=0x0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c
-Time: 108700 ns  Iteration: 0  Process: /design_top_base_test/top_read  Scope: design_top_base_test.top_read  File: /home/ubuntu/CS217_Final_Project/design_top/verif/tests/design_top_base_test.sv Line: 79
-Error: MISMATCH addr=0x33500b00  got=0x0d0d0d0d0d0d0d0d0d0d0d0d0d37ab6f  exp=0x0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d
-Time: 109230 ns  Iteration: 0  Process: /design_top_base_test/top_read  Scope: design_top_base_test.top_read  File: /home/ubuntu/CS217_Final_Project/design_top/verif/tests/design_top_base_test.sv Line: 79
-  PASS addr=0x33500b10
-Error: MISMATCH addr=0x33500b20  got=0x0f0f0f0f0f0f0f0f0f0f0f0f0f37ab6f  exp=0x0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f
-Time: 110290 ns  Iteration: 0  Process: /design_top_base_test/top_read  Scope: design_top_base_test.top_read  File: /home/ubuntu/CS217_Final_Project/design_top/verif/tests/design_top_base_test.sv Line: 79
-Error: MISMATCH addr=0x33500b30  got=0x1010101010101010101010101037ab6f  exp=0x10101010101010101010101010101010
-Time: 110820 ns  Iteration: 0  Process: /design_top_base_test/top_read  Scope: design_top_base_test.top_read  File: /home/ubuntu/CS217_Final_Project/design_top/verif/tests/design_top_base_test.sv Line: 79
-  Optimized wall time: 5730.000 ns
-Total interrupt cycles across all tests: 80
----- SOME TESTS FAILED ----
-$finish called at time : 111460 ns : File "/home/ubuntu/CS217_Final_Project/design_top/verif/tests/design_top_base_test.sv" Line 235
-run: Time (s): cpu = 00:00:00.02 ; elapsed = 00:00:10 . Memory (MB): peak = 1385.965 ; gain = 8.004 ; free physical = 251859 ; free virtual = 265093
+  PASS addr=0x33502000
+  PASS addr=0x33502010
+  PASS addr=0x33502020
+  PASS addr=0x33502030
+  PASS addr=0x33502100
+  PASS addr=0x33502110
+  PASS addr=0x33502120
+  PASS addr=0x33502130
+  PASS addr=0x33502200
+  PASS addr=0x33502210
+  PASS addr=0x33502220
+  PASS addr=0x33502230
+  PASS addr=0x33502300
+  PASS addr=0x33502310
+  PASS addr=0x33502320
+  PASS addr=0x33502330
+  Optimized interrupt cycles: 10
+  >> 4x4 (4x4): naive=10 cyc, optimized=10 cyc, speedup=1.00x
+=========================================================
+ Test: 8x4  (8 x 4)  src=0  naive_dst=1  opt_dst=2
+=========================================================
+  Writing source matrix ...
+  Running naive transpose (opcode 0) ...
+  Verifying naive result (mem=1) ...
+  PASS addr=0x33501000
+  PASS addr=0x33501010
+  PASS addr=0x33501020
+  PASS addr=0x33501030
+  PASS addr=0x33501100
+  PASS addr=0x33501110
+  PASS addr=0x33501120
+  PASS addr=0x33501130
+  PASS addr=0x33501200
+  PASS addr=0x33501210
+  PASS addr=0x33501220
+  PASS addr=0x33501230
+  PASS addr=0x33501300
+  PASS addr=0x33501310
+  PASS addr=0x33501320
+  PASS addr=0x33501330
+  PASS addr=0x33501400
+  PASS addr=0x33501410
+  PASS addr=0x33501420
+  PASS addr=0x33501430
+  PASS addr=0x33501500
+  PASS addr=0x33501510
+  PASS addr=0x33501520
+  PASS addr=0x33501530
+  PASS addr=0x33501600
+  PASS addr=0x33501610
+  PASS addr=0x33501620
+  PASS addr=0x33501630
+  PASS addr=0x33501700
+  PASS addr=0x33501710
+  PASS addr=0x33501720
+  PASS addr=0x33501730
+  Naive interrupt cycles: 10
+  Running optimized transpose (opcode 1, banked BRAM) ...
+  Verifying optimized result (mem=2) ...
+  PASS addr=0x33502000
+  PASS addr=0x33502010
+  PASS addr=0x33502020
+  PASS addr=0x33502030
+  PASS addr=0x33502100
+  PASS addr=0x33502110
+  PASS addr=0x33502120
+  PASS addr=0x33502130
+  PASS addr=0x33502200
+  PASS addr=0x33502210
+  PASS addr=0x33502220
+  PASS addr=0x33502230
+  PASS addr=0x33502300
+  PASS addr=0x33502310
+  PASS addr=0x33502320
+  PASS addr=0x33502330
+  PASS addr=0x33502400
+  PASS addr=0x33502410
+  PASS addr=0x33502420
+  PASS addr=0x33502430
+  PASS addr=0x33502500
+  PASS addr=0x33502510
+  PASS addr=0x33502520
+  PASS addr=0x33502530
+  PASS addr=0x33502600
+  PASS addr=0x33502610
+  PASS addr=0x33502620
+  PASS addr=0x33502630
+  PASS addr=0x33502700
+  PASS addr=0x33502710
+  PASS addr=0x33502720
+  PASS addr=0x33502730
+  Optimized interrupt cycles: 10
+  >> 8x4 (8x4): naive=10 cyc, optimized=10 cyc, speedup=1.00x
+=========================================================
+ Test: 8x8  (8 x 8)  src=0  naive_dst=1  opt_dst=2
+=========================================================
+  Writing source matrix ...
+  Running naive transpose (opcode 0) ...
+  Verifying naive result (mem=1) ...
+  PASS addr=0x33501000
+  PASS addr=0x33501010
+  PASS addr=0x33501020
+  PASS addr=0x33501030
+  PASS addr=0x33501040
+  PASS addr=0x33501050
+  PASS addr=0x33501060
+  PASS addr=0x33501070
+  PASS addr=0x33501100
+  PASS addr=0x33501110
+  PASS addr=0x33501120
+  PASS addr=0x33501130
+  PASS addr=0x33501140
+  PASS addr=0x33501150
+  PASS addr=0x33501160
+  PASS addr=0x33501170
+  PASS addr=0x33501200
+  PASS addr=0x33501210
+  PASS addr=0x33501220
+  PASS addr=0x33501230
+  PASS addr=0x33501240
+  PASS addr=0x33501250
+  PASS addr=0x33501260
+  PASS addr=0x33501270
+  PASS addr=0x33501300
+  PASS addr=0x33501310
+  PASS addr=0x33501320
+  PASS addr=0x33501330
+  PASS addr=0x33501340
+  PASS addr=0x33501350
+  PASS addr=0x33501360
+  PASS addr=0x33501370
+  PASS addr=0x33501400
+  PASS addr=0x33501410
+  PASS addr=0x33501420
+  PASS addr=0x33501430
+  PASS addr=0x33501440
+  PASS addr=0x33501450
+  PASS addr=0x33501460
+  PASS addr=0x33501470
+  PASS addr=0x33501500
+  PASS addr=0x33501510
+  PASS addr=0x33501520
+  PASS addr=0x33501530
+  PASS addr=0x33501540
+  PASS addr=0x33501550
+  PASS addr=0x33501560
+  PASS addr=0x33501570
+  PASS addr=0x33501600
+  PASS addr=0x33501610
+  PASS addr=0x33501620
+  PASS addr=0x33501630
+  PASS addr=0x33501640
+  PASS addr=0x33501650
+  PASS addr=0x33501660
+  PASS addr=0x33501670
+  PASS addr=0x33501700
+  PASS addr=0x33501710
+  PASS addr=0x33501720
+  PASS addr=0x33501730
+  PASS addr=0x33501740
+  PASS addr=0x33501750
+  PASS addr=0x33501760
+  PASS addr=0x33501770
+  Naive interrupt cycles: 10
+  Running optimized transpose (opcode 1, banked BRAM) ...
+  Verifying optimized result (mem=2) ...
+  PASS addr=0x33502000
+  PASS addr=0x33502010
+  PASS addr=0x33502020
+  PASS addr=0x33502030
+  PASS addr=0x33502040
+  PASS addr=0x33502050
+  PASS addr=0x33502060
+  PASS addr=0x33502070
+  PASS addr=0x33502100
+  PASS addr=0x33502110
+  PASS addr=0x33502120
+  PASS addr=0x33502130
+  PASS addr=0x33502140
+  PASS addr=0x33502150
+  PASS addr=0x33502160
+  PASS addr=0x33502170
+  PASS addr=0x33502200
+  PASS addr=0x33502210
+  PASS addr=0x33502220
+  PASS addr=0x33502230
+  PASS addr=0x33502240
+  PASS addr=0x33502250
+  PASS addr=0x33502260
+  PASS addr=0x33502270
+  PASS addr=0x33502300
+  PASS addr=0x33502310
+  PASS addr=0x33502320
+  PASS addr=0x33502330
+  PASS addr=0x33502340
+  PASS addr=0x33502350
+  PASS addr=0x33502360
+  PASS addr=0x33502370
+  PASS addr=0x33502400
+  PASS addr=0x33502410
+  PASS addr=0x33502420
+  PASS addr=0x33502430
+  PASS addr=0x33502440
+  PASS addr=0x33502450
+  PASS addr=0x33502460
+  PASS addr=0x33502470
+  PASS addr=0x33502500
+  PASS addr=0x33502510
+  PASS addr=0x33502520
+  PASS addr=0x33502530
+  PASS addr=0x33502540
+  PASS addr=0x33502550
+  PASS addr=0x33502560
+  PASS addr=0x33502570
+  PASS addr=0x33502600
+  PASS addr=0x33502610
+  PASS addr=0x33502620
+  PASS addr=0x33502630
+  PASS addr=0x33502640
+  PASS addr=0x33502650
+  PASS addr=0x33502660
+  PASS addr=0x33502670
+  PASS addr=0x33502700
+  PASS addr=0x33502710
+  PASS addr=0x33502720
+  PASS addr=0x33502730
+  PASS addr=0x33502740
+  PASS addr=0x33502750
+  PASS addr=0x33502760
+  PASS addr=0x33502770
+  Optimized interrupt cycles: 10
+  >> 8x8 (8x8): naive=10 cyc, optimized=10 cyc, speedup=1.00x
+=========================================================
+ Test: 16x16  (16 x 16)  src=0  naive_dst=1  opt_dst=2
+=========================================================
+  Writing source matrix ...
+  Running naive transpose (opcode 0) ...
+  Verifying naive result (mem=1) ...
+  PASS addr=0x33501000
+  PASS addr=0x33501010
+  PASS addr=0x33501020
+  PASS addr=0x33501030
+  PASS addr=0x33501040
+  PASS addr=0x33501050
+  PASS addr=0x33501060
+  PASS addr=0x33501070
+  PASS addr=0x33501080
+  PASS addr=0x33501090
+  PASS addr=0x335010a0
+  PASS addr=0x335010b0
+  PASS addr=0x335010c0
+  PASS addr=0x335010d0
+  PASS addr=0x335010e0
+  PASS addr=0x335010f0
+  PASS addr=0x33501100
+  PASS addr=0x33501110
+  PASS addr=0x33501120
+  PASS addr=0x33501130
+  PASS addr=0x33501140
+  PASS addr=0x33501150
+  PASS addr=0x33501160
+  PASS addr=0x33501170
+  PASS addr=0x33501180
+  PASS addr=0x33501190
+  PASS addr=0x335011a0
+  PASS addr=0x335011b0
+  PASS addr=0x335011c0
+  PASS addr=0x335011d0
+  PASS addr=0x335011e0
+  PASS addr=0x335011f0
+  PASS addr=0x33501200
+  PASS addr=0x33501210
+  PASS addr=0x33501220
+  PASS addr=0x33501230
+  PASS addr=0x33501240
+  PASS addr=0x33501250
+  PASS addr=0x33501260
+  PASS addr=0x33501270
+  PASS addr=0x33501280
+  PASS addr=0x33501290
+  PASS addr=0x335012a0
+  PASS addr=0x335012b0
+  PASS addr=0x335012c0
+  PASS addr=0x335012d0
+  PASS addr=0x335012e0
+  PASS addr=0x335012f0
+  PASS addr=0x33501300
+  PASS addr=0x33501310
+  PASS addr=0x33501320
+  PASS addr=0x33501330
+  PASS addr=0x33501340
+  PASS addr=0x33501350
+  PASS addr=0x33501360
+  PASS addr=0x33501370
+  PASS addr=0x33501380
+  PASS addr=0x33501390
+  PASS addr=0x335013a0
+  PASS addr=0x335013b0
+  PASS addr=0x335013c0
+  PASS addr=0x335013d0
+  PASS addr=0x335013e0
+  PASS addr=0x335013f0
+  PASS addr=0x33501400
+  PASS addr=0x33501410
+  PASS addr=0x33501420
+  PASS addr=0x33501430
+  PASS addr=0x33501440
+  PASS addr=0x33501450
+  PASS addr=0x33501460
+  PASS addr=0x33501470
+  PASS addr=0x33501480
+  PASS addr=0x33501490
+  PASS addr=0x335014a0
+  PASS addr=0x335014b0
+  PASS addr=0x335014c0
+  PASS addr=0x335014d0
+  PASS addr=0x335014e0
+  PASS addr=0x335014f0
+  PASS addr=0x33501500
+  PASS addr=0x33501510
+  PASS addr=0x33501520
+  PASS addr=0x33501530
+  PASS addr=0x33501540
+  PASS addr=0x33501550
+  PASS addr=0x33501560
+  PASS addr=0x33501570
+  PASS addr=0x33501580
+  PASS addr=0x33501590
+  PASS addr=0x335015a0
+  PASS addr=0x335015b0
+  PASS addr=0x335015c0
+  PASS addr=0x335015d0
+  PASS addr=0x335015e0
+  PASS addr=0x335015f0
+  PASS addr=0x33501600
+  PASS addr=0x33501610
+  PASS addr=0x33501620
+  PASS addr=0x33501630
+  PASS addr=0x33501640
+  PASS addr=0x33501650
+  PASS addr=0x33501660
+  PASS addr=0x33501670
+  PASS addr=0x33501680
+  PASS addr=0x33501690
+  PASS addr=0x335016a0
+  PASS addr=0x335016b0
+  PASS addr=0x335016c0
+  PASS addr=0x335016d0
+  PASS addr=0x335016e0
+  PASS addr=0x335016f0
+  PASS addr=0x33501700
+  PASS addr=0x33501710
+  PASS addr=0x33501720
+  PASS addr=0x33501730
+  PASS addr=0x33501740
+  PASS addr=0x33501750
+  PASS addr=0x33501760
+  PASS addr=0x33501770
+  PASS addr=0x33501780
+  PASS addr=0x33501790
+  PASS addr=0x335017a0
+  PASS addr=0x335017b0
+  PASS addr=0x335017c0
+  PASS addr=0x335017d0
+  PASS addr=0x335017e0
+  PASS addr=0x335017f0
+  PASS addr=0x33501800
+  PASS addr=0x33501810
+  PASS addr=0x33501820
+  PASS addr=0x33501830
+  PASS addr=0x33501840
+  PASS addr=0x33501850
+  PASS addr=0x33501860
+  PASS addr=0x33501870
+  PASS addr=0x33501880
+  PASS addr=0x33501890
+  PASS addr=0x335018a0
+  PASS addr=0x335018b0
+  PASS addr=0x335018c0
+  PASS addr=0x335018d0
+  PASS addr=0x335018e0
+  PASS addr=0x335018f0
+  PASS addr=0x33501900
+  PASS addr=0x33501910
+  PASS addr=0x33501920
+  PASS addr=0x33501930
+  PASS addr=0x33501940
+  PASS addr=0x33501950
+  PASS addr=0x33501960
+  PASS addr=0x33501970
+  PASS addr=0x33501980
+  PASS addr=0x33501990
+  PASS addr=0x335019a0
+  PASS addr=0x335019b0
+  PASS addr=0x335019c0
+  PASS addr=0x335019d0
+  PASS addr=0x335019e0
+  PASS addr=0x335019f0
+  PASS addr=0x33501a00
+  PASS addr=0x33501a10
+  PASS addr=0x33501a20
+  PASS addr=0x33501a30
+  PASS addr=0x33501a40
+  PASS addr=0x33501a50
+  PASS addr=0x33501a60
+  PASS addr=0x33501a70
+  PASS addr=0x33501a80
+  PASS addr=0x33501a90
+  PASS addr=0x33501aa0
+  PASS addr=0x33501ab0
+  PASS addr=0x33501ac0
+  PASS addr=0x33501ad0
+  PASS addr=0x33501ae0
+  PASS addr=0x33501af0
+  PASS addr=0x33501b00
+  PASS addr=0x33501b10
+  PASS addr=0x33501b20
+  PASS addr=0x33501b30
+  PASS addr=0x33501b40
+  PASS addr=0x33501b50
+  PASS addr=0x33501b60
+  PASS addr=0x33501b70
+  PASS addr=0x33501b80
+  PASS addr=0x33501b90
+  PASS addr=0x33501ba0
+  PASS addr=0x33501bb0
+  PASS addr=0x33501bc0
+  PASS addr=0x33501bd0
+  PASS addr=0x33501be0
+  PASS addr=0x33501bf0
+  PASS addr=0x33501c00
+  PASS addr=0x33501c10
+  PASS addr=0x33501c20
+  PASS addr=0x33501c30
+  PASS addr=0x33501c40
+  PASS addr=0x33501c50
+  PASS addr=0x33501c60
+  PASS addr=0x33501c70
+  PASS addr=0x33501c80
+  PASS addr=0x33501c90
+  PASS addr=0x33501ca0
+  PASS addr=0x33501cb0
+  PASS addr=0x33501cc0
+  PASS addr=0x33501cd0
+  PASS addr=0x33501ce0
+  PASS addr=0x33501cf0
+  PASS addr=0x33501d00
+  PASS addr=0x33501d10
+  PASS addr=0x33501d20
+  PASS addr=0x33501d30
+  PASS addr=0x33501d40
+  PASS addr=0x33501d50
+  PASS addr=0x33501d60
+  PASS addr=0x33501d70
+  PASS addr=0x33501d80
+  PASS addr=0x33501d90
+  PASS addr=0x33501da0
+  PASS addr=0x33501db0
+  PASS addr=0x33501dc0
+  PASS addr=0x33501dd0
+  PASS addr=0x33501de0
+  PASS addr=0x33501df0
+  PASS addr=0x33501e00
+  PASS addr=0x33501e10
+  PASS addr=0x33501e20
+  PASS addr=0x33501e30
+  PASS addr=0x33501e40
+  PASS addr=0x33501e50
+  PASS addr=0x33501e60
+  PASS addr=0x33501e70
+  PASS addr=0x33501e80
+  PASS addr=0x33501e90
+  PASS addr=0x33501ea0
+  PASS addr=0x33501eb0
+  PASS addr=0x33501ec0
+  PASS addr=0x33501ed0
+  PASS addr=0x33501ee0
+  PASS addr=0x33501ef0
+  PASS addr=0x33501f00
+  PASS addr=0x33501f10
+  PASS addr=0x33501f20
+  PASS addr=0x33501f30
+  PASS addr=0x33501f40
+  PASS addr=0x33501f50
+  PASS addr=0x33501f60
+  PASS addr=0x33501f70
+  PASS addr=0x33501f80
+  PASS addr=0x33501f90
+  PASS addr=0x33501fa0
+  PASS addr=0x33501fb0
+  PASS addr=0x33501fc0
+  PASS addr=0x33501fd0
+  PASS addr=0x33501fe0
+  PASS addr=0x33501ff0
+  Naive interrupt cycles: 10
+  Running optimized transpose (opcode 1, banked BRAM) ...
+  Verifying optimized result (mem=2) ...
+  PASS addr=0x33502000
+  PASS addr=0x33502010
+  PASS addr=0x33502020
+  PASS addr=0x33502030
+  PASS addr=0x33502040
+  PASS addr=0x33502050
+  PASS addr=0x33502060
+  PASS addr=0x33502070
+  PASS addr=0x33502080
+  PASS addr=0x33502090
+  PASS addr=0x335020a0
+  PASS addr=0x335020b0
+  PASS addr=0x335020c0
+  PASS addr=0x335020d0
+  PASS addr=0x335020e0
+  PASS addr=0x335020f0
+  PASS addr=0x33502100
+  PASS addr=0x33502110
+  PASS addr=0x33502120
+  PASS addr=0x33502130
+  PASS addr=0x33502140
+  PASS addr=0x33502150
+  PASS addr=0x33502160
+  PASS addr=0x33502170
+  PASS addr=0x33502180
+  PASS addr=0x33502190
+  PASS addr=0x335021a0
+  PASS addr=0x335021b0
+  PASS addr=0x335021c0
+  PASS addr=0x335021d0
+  PASS addr=0x335021e0
+  PASS addr=0x335021f0
+  PASS addr=0x33502200
+  PASS addr=0x33502210
+  PASS addr=0x33502220
+  PASS addr=0x33502230
+  PASS addr=0x33502240
+  PASS addr=0x33502250
+  PASS addr=0x33502260
+  PASS addr=0x33502270
+  PASS addr=0x33502280
+  PASS addr=0x33502290
+  PASS addr=0x335022a0
+  PASS addr=0x335022b0
+  PASS addr=0x335022c0
+  PASS addr=0x335022d0
+  PASS addr=0x335022e0
+  PASS addr=0x335022f0
+  PASS addr=0x33502300
+  PASS addr=0x33502310
+  PASS addr=0x33502320
+  PASS addr=0x33502330
+  PASS addr=0x33502340
+  PASS addr=0x33502350
+  PASS addr=0x33502360
+  PASS addr=0x33502370
+  PASS addr=0x33502380
+  PASS addr=0x33502390
+  PASS addr=0x335023a0
+  PASS addr=0x335023b0
+  PASS addr=0x335023c0
+  PASS addr=0x335023d0
+  PASS addr=0x335023e0
+  PASS addr=0x335023f0
+  PASS addr=0x33502400
+  PASS addr=0x33502410
+  PASS addr=0x33502420
+  PASS addr=0x33502430
+  PASS addr=0x33502440
+  PASS addr=0x33502450
+  PASS addr=0x33502460
+  PASS addr=0x33502470
+  PASS addr=0x33502480
+  PASS addr=0x33502490
+  PASS addr=0x335024a0
+  PASS addr=0x335024b0
+  PASS addr=0x335024c0
+  PASS addr=0x335024d0
+  PASS addr=0x335024e0
+  PASS addr=0x335024f0
+  PASS addr=0x33502500
+  PASS addr=0x33502510
+  PASS addr=0x33502520
+  PASS addr=0x33502530
+  PASS addr=0x33502540
+  PASS addr=0x33502550
+  PASS addr=0x33502560
+  PASS addr=0x33502570
+  PASS addr=0x33502580
+  PASS addr=0x33502590
+  PASS addr=0x335025a0
+  PASS addr=0x335025b0
+  PASS addr=0x335025c0
+  PASS addr=0x335025d0
+  PASS addr=0x335025e0
+  PASS addr=0x335025f0
+  PASS addr=0x33502600
+  PASS addr=0x33502610
+  PASS addr=0x33502620
+  PASS addr=0x33502630
+  PASS addr=0x33502640
+  PASS addr=0x33502650
+  PASS addr=0x33502660
+  PASS addr=0x33502670
+  PASS addr=0x33502680
+  PASS addr=0x33502690
+  PASS addr=0x335026a0
+  PASS addr=0x335026b0
+  PASS addr=0x335026c0
+  PASS addr=0x335026d0
+  PASS addr=0x335026e0
+  PASS addr=0x335026f0
+  PASS addr=0x33502700
+  PASS addr=0x33502710
+  PASS addr=0x33502720
+  PASS addr=0x33502730
+  PASS addr=0x33502740
+  PASS addr=0x33502750
+  PASS addr=0x33502760
+  PASS addr=0x33502770
+  PASS addr=0x33502780
+  PASS addr=0x33502790
+  PASS addr=0x335027a0
+  PASS addr=0x335027b0
+  PASS addr=0x335027c0
+  PASS addr=0x335027d0
+  PASS addr=0x335027e0
+  PASS addr=0x335027f0
+  PASS addr=0x33502800
+  PASS addr=0x33502810
+  PASS addr=0x33502820
+  PASS addr=0x33502830
+  PASS addr=0x33502840
+  PASS addr=0x33502850
+  PASS addr=0x33502860
+  PASS addr=0x33502870
+  PASS addr=0x33502880
+  PASS addr=0x33502890
+  PASS addr=0x335028a0
+  PASS addr=0x335028b0
+  PASS addr=0x335028c0
+  PASS addr=0x335028d0
+  PASS addr=0x335028e0
+  PASS addr=0x335028f0
+  PASS addr=0x33502900
+  PASS addr=0x33502910
+  PASS addr=0x33502920
+  PASS addr=0x33502930
+  PASS addr=0x33502940
+  PASS addr=0x33502950
+  PASS addr=0x33502960
+  PASS addr=0x33502970
+  PASS addr=0x33502980
+  PASS addr=0x33502990
+  PASS addr=0x335029a0
+  PASS addr=0x335029b0
+  PASS addr=0x335029c0
+  PASS addr=0x335029d0
+  PASS addr=0x335029e0
+  PASS addr=0x335029f0
+  PASS addr=0x33502a00
+  PASS addr=0x33502a10
+  PASS addr=0x33502a20
+  PASS addr=0x33502a30
+  PASS addr=0x33502a40
+  PASS addr=0x33502a50
+  PASS addr=0x33502a60
+  PASS addr=0x33502a70
+  PASS addr=0x33502a80
+  PASS addr=0x33502a90
+  PASS addr=0x33502aa0
+  PASS addr=0x33502ab0
+  PASS addr=0x33502ac0
+  PASS addr=0x33502ad0
+  PASS addr=0x33502ae0
+  PASS addr=0x33502af0
+  PASS addr=0x33502b00
+  PASS addr=0x33502b10
+  PASS addr=0x33502b20
+  PASS addr=0x33502b30
+  PASS addr=0x33502b40
+  PASS addr=0x33502b50
+  PASS addr=0x33502b60
+  PASS addr=0x33502b70
+  PASS addr=0x33502b80
+  PASS addr=0x33502b90
+  PASS addr=0x33502ba0
+  PASS addr=0x33502bb0
+  PASS addr=0x33502bc0
+  PASS addr=0x33502bd0
+  PASS addr=0x33502be0
+  PASS addr=0x33502bf0
+  PASS addr=0x33502c00
+  PASS addr=0x33502c10
+  PASS addr=0x33502c20
+  PASS addr=0x33502c30
+  PASS addr=0x33502c40
+  PASS addr=0x33502c50
+  PASS addr=0x33502c60
+  PASS addr=0x33502c70
+  PASS addr=0x33502c80
+  PASS addr=0x33502c90
+  PASS addr=0x33502ca0
+  PASS addr=0x33502cb0
+  PASS addr=0x33502cc0
+  PASS addr=0x33502cd0
+  PASS addr=0x33502ce0
+  PASS addr=0x33502cf0
+  PASS addr=0x33502d00
+  PASS addr=0x33502d10
+  PASS addr=0x33502d20
+  PASS addr=0x33502d30
+  PASS addr=0x33502d40
+  PASS addr=0x33502d50
+  PASS addr=0x33502d60
+  PASS addr=0x33502d70
+  PASS addr=0x33502d80
+  PASS addr=0x33502d90
+  PASS addr=0x33502da0
+  PASS addr=0x33502db0
+  PASS addr=0x33502dc0
+  PASS addr=0x33502dd0
+  PASS addr=0x33502de0
+  PASS addr=0x33502df0
+  PASS addr=0x33502e00
+  PASS addr=0x33502e10
+  PASS addr=0x33502e20
+  PASS addr=0x33502e30
+  PASS addr=0x33502e40
+  PASS addr=0x33502e50
+  PASS addr=0x33502e60
+  PASS addr=0x33502e70
+  PASS addr=0x33502e80
+  PASS addr=0x33502e90
+  PASS addr=0x33502ea0
+  PASS addr=0x33502eb0
+  PASS addr=0x33502ec0
+  PASS addr=0x33502ed0
+  PASS addr=0x33502ee0
+  PASS addr=0x33502ef0
+  PASS addr=0x33502f00
+  PASS addr=0x33502f10
+  PASS addr=0x33502f20
+  PASS addr=0x33502f30
+  PASS addr=0x33502f40
+  PASS addr=0x33502f50
+  PASS addr=0x33502f60
+  PASS addr=0x33502f70
+  PASS addr=0x33502f80
+  PASS addr=0x33502f90
+  PASS addr=0x33502fa0
+  PASS addr=0x33502fb0
+  PASS addr=0x33502fc0
+  PASS addr=0x33502fd0
+  PASS addr=0x33502fe0
+  PASS addr=0x33502ff0
+  Optimized interrupt cycles: 10
+  >> 16x16 (16x16): naive=10 cyc, optimized=10 cyc, speedup=1.00x
+Total interrupt cycles across all tests: 100
+---- ALL TESTS PASSED ----
+$finish called at time : 875970 ns : File "/home/ubuntu/CS217_Final_Project/design_top/verif/tests/design_top_base_test.sv" Line 268
+run: Time (s): cpu = 00:00:00.15 ; elapsed = 00:01:15 . Memory (MB): peak = 1441.961 ; gain = 0.000 ; free physical = 251828 ; free virtual = 265077
 ## quit
-INFO: [Common 17-206] Exiting xsim at Sun Mar  8 23:32:22 2026...
+INFO: xsimkernel Simulation Memory Usage: 200016 KB (Peak: 234320 KB), Simulation CPU Usage: 74830 ms
+INFO: [Common 17-206] Exiting xsim at Mon Mar  9 01:34:25 2026...
 make[1]: Leaving directory '/home/ubuntu/CS217_Final_Project/design_top/verif/scripts'
